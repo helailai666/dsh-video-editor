@@ -40,7 +40,7 @@ DeepSeek Harness 内的 AI 视频创作与剪辑工作台。<br>
 ### GitHub 仓库
 
 ```text
-https://github.com/heswy/dsh-video-editor
+https://github.com/helailai666/dsh-video-editor
 ```
 
 ### npm 包名
@@ -85,7 +85,7 @@ npm 安装推荐选择官方源。
 ## 开发
 
 ```sh
-git clone https://github.com/heswy/dsh-video-editor.git
+git clone https://github.com/helailai666/dsh-video-editor.git
 cd dsh-video-editor
 npm ci --ignore-scripts
 npm run check
@@ -94,7 +94,7 @@ node --test tests/*.test.mjs
 
 运行时为直接加载的 JavaScript。`host/` 负责工程、会话与资源边界，`client.js` 提供原生工作区，`packages/` 保存独立视频引擎。开发规则见 [DEVELOPMENT](docs/DEVELOPMENT.md)，发布流程见[发行指南](docs/releases/UPDATE-CHANNEL.md)。
 
-发现问题请提交 [Issue](https://github.com/heswy/dsh-video-editor/issues)，附 DSH/插件版本、设备及复现步骤。安全问题见 [SECURITY](SECURITY.md)。
+发现问题请提交 [Issue](https://github.com/helailai666/dsh-video-editor/issues)，附 DSH/插件版本、设备及复现步骤。安全问题见 [SECURITY](SECURITY.md)。
 
 ## 致谢与许可
 

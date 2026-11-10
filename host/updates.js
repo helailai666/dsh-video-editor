@@ -2,8 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 const manifest=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
-const REPO='https://github.com/heswy/dsh-video-editor';
-const API='https://api.github.com/repos/heswy/dsh-video-editor/releases/latest';
+const REPO='https://github.com/helailai666/dsh-video-editor';
+const API='https://api.github.com/repos/helailai666/dsh-video-editor/releases/latest';
 const stable=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const newer=(a,b)=>{if(!stable.test(a))return false;const base=b.split('-')[0];if(!stable.test(base))return false;const x=a.split('.').map(BigInt),y=base.split('.').map(BigInt);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]>y[i];return b.includes('-');};
 export class PluginUpdates{
@@ -32,7 +32,7 @@ export class PluginUpdates{
         if(listed.status!=='accepted')throw new Error('Version lookup unavailable');
         const v=listed.versions.find(x=>x.bundle&&!x.incompatible&&!x.deprecated&&!x.prerelease&&newer(x.version,this.version));
         if(v)candidate={version:v.version,kind:'registry',registry:listed.registry};
-      }else if(source.startsWith(REPO+'/releases/download/')||/^(?:git\+)?https:\/\/github\.com\/heswy\/dsh-video-editor(?:\.git)?(?:#.*)?$/.test(source)||/^github:heswy\/dsh-video-editor(?:#.*)?$/.test(source)){
+      }else if(source.startsWith(REPO+'/releases/download/')||/^(?:git\+)?https:\/\/github\.com\/helailai666\/dsh-video-editor(?:\.git)?(?:#.*)?$/.test(source)||/^github:helailai666\/dsh-video-editor(?:#.*)?$/.test(source)){
         this.abort=new AbortController();const timer=setTimeout(()=>this.abort?.abort(),8000);
         try{
           const response=await this.fetchImpl(API,{headers:{accept:'application/vnd.github+json'},signal:this.abort.signal});

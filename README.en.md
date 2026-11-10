@@ -40,7 +40,7 @@ Open DSH **Plugins → Add plugin**, enter one of the following sources, install
 ### GitHub repository
 
 ```text
-https://github.com/heswy/dsh-video-editor
+https://github.com/helailai666/dsh-video-editor
 ```
 
 ### npm package
@@ -85,7 +85,7 @@ Disable the plugin from DSH's plugin page. To roll back, reinstall the previous 
 ## Development
 
 ```sh
-git clone https://github.com/heswy/dsh-video-editor.git
+git clone https://github.com/helailai666/dsh-video-editor.git
 cd dsh-video-editor
 npm ci --ignore-scripts
 npm run check
@@ -94,7 +94,7 @@ node --test tests/*.test.mjs
 
 The runtime loads JavaScript directly. `host/` owns project, session, and resource boundaries; `client.js` provides the native workspace; `packages/` contains the independent engine. Read [development rules](docs/DEVELOPMENT.md) and the [publishing guide](docs/releases/UPDATE-CHANNEL.md).
 
-Report problems through [Issues](https://github.com/heswy/dsh-video-editor/issues) with your DSH/plugin version, device, and reproduction steps. See [SECURITY](SECURITY.md) for vulnerability reports.
+Report problems through [Issues](https://github.com/helailai666/dsh-video-editor/issues) with your DSH/plugin version, device, and reproduction steps. See [SECURITY](SECURITY.md) for vulnerability reports.
 
 ## Acknowledgements and license
 

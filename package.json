@@ -1,6 +1,6 @@
 {
   "name": "dsh-video-editor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "description": "Create, preview and edit videos with AI inside DeepSeek Harness.",
   "type": "module",
@@ -52,11 +52,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/heswy/dsh-video-editor.git"
+    "url": "https://github.com/helailai666/dsh-video-editor.git"
   },
-  "homepage": "https://github.com/heswy/dsh-video-editor",
+  "homepage": "https://github.com/helailai666/dsh-video-editor",
   "bugs": {
-    "url": "https://github.com/heswy/dsh-video-editor/issues"
+    "url": "https://github.com/helailai666/dsh-video-editor/issues"
   },
   "keywords": [
     "dsh-plugin",
