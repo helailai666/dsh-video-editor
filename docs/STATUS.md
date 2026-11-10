@@ -2,7 +2,11 @@
 
 更新：2026-11-10。
 
-## 分支中：设置页音乐模型、追加提示词与选区配乐
+## 1.0.1：GitHub 源码安装通道
+
+设置页音乐模型、追加系统提示词与选区配乐已通过 PR #1 合入 main（c7e8a80）。版本 bump 至 **1.0.1**，安装源统一为 `https://github.com/helailai666/dsh-video-editor`（README、发行指南、插件更新检测 `host/updates.js` 与相关测试同步）。DSH 插件页填该仓库 URL 即可安装/更新；`v1.0.1` tag 在 bump 合入 main 后创建。npm 仍为 1.0.0，1.0.1 的 npm 发布未执行（需 npm 登录与 POSIX 安装验证门禁）。
+
+## 分支中：设置页音乐模型、追加提示词与选区配乐（已合入）
 
 `codex/music-model-range-score`（基于 main b901caf）实现并分层验证：
 
@@ -38,4 +42,4 @@ npm **dsh-video-editor@1.0.0** 已于2026-10-25公开发布：[npm 包](https://
 
 实测平台为 macOS Apple Silicon；Node22+、FFmpeg/ffprobe、Chrome 由系统提供。Windows/Linux/Intel、扬声器听感及真实模型复杂多轮效果未在本轮复验。画布对象直接编辑延期。
 
-开发规则见 [DEVELOPMENT](DEVELOPMENT.md)，交接见 [handoffs](handoffs/README.md)。历史证据见[整理前固定版本](https://github.com/heswy/dsh-video-editor/tree/56841bb60b989aa55aa0ef4897f107a8a66823d1)。
+开发规则见 [DEVELOPMENT](DEVELOPMENT.md)，交接见 [handoffs](handoffs/README.md)。历史证据见[整理前固定版本](https://github.com/helailai666/dsh-video-editor/tree/56841bb60b989aa55aa0ef4897f107a8a66823d1)。

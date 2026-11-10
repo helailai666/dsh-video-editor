@@ -27,7 +27,7 @@ for(const name of ['engine-client','engine-worker']){
  if(name==='engine-worker')await cp(join(stage,name,'node_modules'),join(target,'node_modules'),{recursive:true,dereference:true});
 }
 manifest.private=false;manifest.engines={node:'>=22',dsh:'>=0.2.1-rc.2'};delete manifest.dependencies;delete manifest.devDependencies;delete manifest.scripts;
-manifest.repository={type:'git',url:'https://github.com/heswy/dsh-video-editor.git'};manifest.homepage='https://github.com/heswy/dsh-video-editor';manifest.keywords=['dsh-plugin','video-editor'];
+manifest.repository={type:'git',url:'https://github.com/helailai666/dsh-video-editor.git'};manifest.homepage='https://github.com/helailai666/dsh-video-editor';manifest.keywords=['dsh-plugin','video-editor'];
 manifest.files=[...(manifest.files||[]),'runtime/','RELEASE.json'];
 await writeFile(join(pkg,'package.json'),JSON.stringify(manifest,null,2)+'\n');
 const release={format:1,version:manifest.version,rootCommit,platform:process.platform,arch:process.arch,stageIntegritySha256:createHash('sha256').update(await readFile(join(stage,'INTEGRITY.json'))).digest('hex')};

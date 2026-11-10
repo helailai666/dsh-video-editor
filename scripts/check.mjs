@@ -134,8 +134,8 @@ check('bundle manifest declares patch and client', () => {
   return `platform=web, inject=[${pkg.dsh.client.inject.join(', ')}]`;
 });
 
-check('package version advanced for the V1 conversational audio 1.0.0 candidate', () => {
-  assert(pkg.version === '1.0.0', `expected version 1.0.0, found "${pkg.version}"`);
+check('package version advanced for the 1.0.1 settings/range-scoring release', () => {
+  assert(pkg.version === '1.0.1', `expected version 1.0.1, found "${pkg.version}"`);
   return pkg.version;
 });
 

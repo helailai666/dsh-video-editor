@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PluginUpdates, createUpdateRoute } from '../host/updates.js';
-const source='https://github.com/heswy/dsh-video-editor/releases/download/v1.0.0/dsh-video-1.0.0.tgz';
+const source='https://github.com/helailai666/dsh-video-editor/releases/download/v1.0.0/dsh-video-1.0.0.tgz';
 const assetName='dsh-video-1.0.1-'+process.platform+'-'+process.arch+'.tgz';
-const release={tag_name:'v1.0.1',draft:false,prerelease:false,assets:[{name:assetName,browser_download_url:'https://github.com/heswy/dsh-video-editor/releases/download/v1.0.1/'+assetName}]};
+const release={tag_name:'v1.0.1',draft:false,prerelease:false,assets:[{name:assetName,browser_download_url:'https://github.com/helailai666/dsh-video-editor/releases/download/v1.0.1/'+assetName}]};
 function fixture(overrides={}){const calls=[];const manager={listBundles:async()=>[{name:'dsh-video-editor',source}],removeBundle:async()=>({application:'applied'}),installBundle:async(...args)=>{calls.push(args);return {application:'restart-required',version:'1.0.1'};},...overrides};let fetched=0;const service=new PluginUpdates({manager,version:'1.0.0',fetchImpl:async()=>{fetched++;return new Response(JSON.stringify(release));}});return {service,calls,get fetched(){return fetched;}};}
 test('local installs are explicit and never fetch or update',async()=>{const f=fixture({listBundles:async()=>[{name:'dsh-video-editor',source:'link:/tmp/dev'}]});assert.equal((await f.service.check()).phase,'local');assert.equal(f.fetched,0);await assert.rejects(()=>f.service.install('1.0.1'));assert.equal(f.calls.length,0);});
 test('GitHub release update is exact, cached, opt-in and single flight',async()=>{const f=fixture();assert.equal((await f.service.check()).phase,'available');await f.service.check();assert.equal(f.fetched,1);await assert.rejects(()=>f.service.install('9.9.9'));assert.equal(f.calls.length,0);const [a,b]=await Promise.all([f.service.install('1.0.1'),f.service.install('1.0.1')]);assert.equal(a.phase,'installing');assert.equal(b.phase,'installing');await f.service.pending;assert.equal(f.service.status().phase,'restart-required');assert.equal(f.calls.length,1);assert.equal(f.calls[0][0],release.assets[0].browser_download_url);});
@@ -20,10 +20,10 @@ test('network failure remains retryable and never installs',async()=>{const f=fi
 test('oversized release response is refused',async()=>{const f=fixture();f.service.fetchImpl=async()=>new Response('x'.repeat(1048577));assert.equal((await f.service.check()).phase,'check-failed');assert.equal(f.calls.length,0);});
 
 test('GitHub repository inputs are recognized without a pinned fragment', async()=>{
-  for(const source of ['https://github.com/heswy/dsh-video-editor','https://github.com/heswy/dsh-video-editor.git','git+https://github.com/heswy/dsh-video-editor.git','github:heswy/dsh-video-editor']){
+  for(const source of ['https://github.com/helailai666/dsh-video-editor','https://github.com/helailai666/dsh-video-editor.git','git+https://github.com/helailai666/dsh-video-editor.git','github:helailai666/dsh-video-editor']){
     const f=fixture({listBundles:async()=>[{name:'dsh-video-editor',source}]});
     assert.equal((await f.service.check()).phase,'available',source);
   }
-  const f=fixture({listBundles:async()=>[{name:'dsh-video-editor',source:'https://github.com/heswy/dsh-video-editor-evil'}]});
+  const f=fixture({listBundles:async()=>[{name:'dsh-video-editor',source:'https://github.com/helailai666/dsh-video-editor-evil'}]});
   assert.equal((await f.service.check()).phase,'unsupported');
 });
