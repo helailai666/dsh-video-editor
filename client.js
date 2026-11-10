@@ -166,6 +166,52 @@ window.__ModuleLoader__.load({
       'video.update.install': "安装更新",
       'video.update.check': "检查更新",
       'video.timeline.enableOriginal': "开启视频原声",
+      'video.timeline.rangeScore': "框选配乐",
+      'video.timeline.rangeTitle': "配乐选区",
+      'video.timeline.rangeLabel': "时间范围 {from}–{to}",
+      'video.timeline.rangeDescription': "引用这个时间范围生成配乐",
+      'video.timeline.rangeReady': "选区已注册：在右侧对话输入 @ 选择「当前时间范围」，再描述剧情节奏。",
+      'video.timeline.rangeFrom': "选区起点（秒）",
+      'video.timeline.rangeTo': "选区终点（秒）",
+      'video.timeline.rangeCopy': "复制引用",
+      'video.timeline.rangeCopied': "已复制选区引用。",
+      'video.timeline.rangeAdd': "添加到聊天",
+      'video.timeline.rangeAdded': "已复制选区引用：在右侧对话输入 @ 选择「当前时间范围」，或直接粘贴。",
+      'video.timeline.rangeClear': "清除选区",
+      'video.timeline.rangeInvalid': "请输入作品时长内的有效范围",
+      'video.timeline.rangeCopyFailed': "复制失败，请手动选择引用文本",
+      'video.settings.title': "设置",
+      'video.settings.tabModels': "音乐模型",
+      'video.settings.tabPrompt': "系统提示词",
+      'video.settings.modelsHelp': "在此添加、编辑、删除和测试音乐模型；密钥只保存在本机 Host，不会回显，也无需编辑任何配置文件。",
+      'video.settings.default': "默认",
+      'video.settings.builtIn': "内置",
+      'video.settings.hasKey': "已配置密钥",
+      'video.settings.noKey': "未配置密钥",
+      'video.settings.setDefault': "设为默认",
+      'video.settings.test': "测试连接",
+      'video.settings.testOk': "连接成功",
+      'video.settings.edit': "编辑",
+      'video.settings.remove': "删除",
+      'video.settings.confirmRemove': "确认删除",
+      'video.settings.add': "添加音乐模型",
+      'video.settings.name': "名称",
+      'video.settings.protocol': "协议",
+      'video.settings.protocolSync': "同步返回",
+      'video.settings.protocolAsync': "异步任务",
+      'video.settings.remoteModel': "远端模型 ID",
+      'video.settings.apiKey': "API Key",
+      'video.settings.apiKeyKeep': "留空保留现有密钥",
+      'video.settings.builtInKeyHelp': "内置千问云密钥",
+      'video.settings.save': "保存",
+      'video.settings.cancel': "取消",
+      'video.settings.saved': "设置已保存",
+      'video.settings.removed': "模型已删除",
+      'video.settings.defaultSet': "已设为默认配乐模型",
+      'video.settings.promptHelp': "追加而非替换：你的补充指令会附加在固定规则之后，不能覆盖安全、凭据、revision 与 Tool 契约规则。",
+      'video.settings.promptFixed': "固定规则由 Host 维护：工程写入边界、revision 与 operationId、凭据安全、成功判定等始终生效。",
+      'video.settings.promptPlaceholder': "例如：配乐默认保持器乐、突出对抗节奏……",
+      'video.settings.promptReset': "已恢复默认提示词",
       'video.timeline.disableOriginal': "关闭视频原声",
       'video.timeline.enableClipSound': "开启片段声音",
       'video.timeline.disableClipSound': "关闭片段声音",
@@ -440,6 +486,52 @@ window.__ModuleLoader__.load({
       'video.update.install': "Install update",
       'video.update.check': "Check for updates",
       'video.timeline.enableOriginal': "Enable original audio",
+      'video.timeline.rangeScore': "Range scoring",
+      'video.timeline.rangeTitle': "Scoring range",
+      'video.timeline.rangeLabel': "Range {from}–{to}",
+      'video.timeline.rangeDescription': "Use this range for background scoring",
+      'video.timeline.rangeReady': "Range registered: type @ in the chat on the right and pick 当前时间范围, then describe the scene.",
+      'video.timeline.rangeFrom': "Range start (seconds)",
+      'video.timeline.rangeTo': "Range end (seconds)",
+      'video.timeline.rangeCopy': "Copy reference",
+      'video.timeline.rangeCopied': "Range reference copied.",
+      'video.timeline.rangeAdd': "Add to chat",
+      'video.timeline.rangeAdded': "Range reference copied: type @ in the chat on the right and pick 当前时间范围, or paste it directly.",
+      'video.timeline.rangeClear': "Clear range",
+      'video.timeline.rangeInvalid': "Enter a valid range inside the project duration",
+      'video.timeline.rangeCopyFailed': "Copy failed; select the reference text manually",
+      'video.settings.title': "Settings",
+      'video.settings.tabModels': "Music models",
+      'video.settings.tabPrompt': "System prompt",
+      'video.settings.modelsHelp': "Add, edit, remove and test music models here. Keys stay in the local Host, are never re-displayed, and no config file editing is required.",
+      'video.settings.default': "Default",
+      'video.settings.builtIn': "Built-in",
+      'video.settings.hasKey': "Key configured",
+      'video.settings.noKey': "No key yet",
+      'video.settings.setDefault': "Set default",
+      'video.settings.test': "Test connection",
+      'video.settings.testOk': "Connected",
+      'video.settings.edit': "Edit",
+      'video.settings.remove': "Remove",
+      'video.settings.confirmRemove': "Confirm remove",
+      'video.settings.add': "Add music model",
+      'video.settings.name': "Name",
+      'video.settings.protocol': "Protocol",
+      'video.settings.protocolSync': "Sync response",
+      'video.settings.protocolAsync': "Async task",
+      'video.settings.remoteModel': "Remote model ID",
+      'video.settings.apiKey': "API Key",
+      'video.settings.apiKeyKeep': "Leave blank to keep the current key",
+      'video.settings.builtInKeyHelp': "Built-in Qianwen key",
+      'video.settings.save': "Save",
+      'video.settings.cancel': "Cancel",
+      'video.settings.saved': "Settings saved",
+      'video.settings.removed': "Model removed",
+      'video.settings.defaultSet': "Default music model updated",
+      'video.settings.promptHelp': "Append-only: your extra instructions follow the fixed rules and can never override safety, credentials, revision or Tool contracts.",
+      'video.settings.promptFixed': "Fixed rules are Host-owned: project-write boundaries, revision/operationId contracts and credential safety always apply.",
+      'video.settings.promptPlaceholder': "e.g. Background scores should stay instrumental with a driving rhythm…",
+      'video.settings.promptReset': "Prompt restored to default",
       'video.timeline.disableOriginal': "Disable original audio",
       'video.timeline.enableClipSound': "Enable clip audio",
       'video.timeline.disableClipSound': "Disable clip audio",
@@ -1720,6 +1812,43 @@ window.__ModuleLoader__.load({
  gap:12px;overflow:auto;font-size:12px;line-height:1.5;
 }
 .dv-root .dv-reference-panel{top:64px;right:12px;left:auto;width:calc(100% - 24px);max-width:400px;max-height:calc(100% - 80px)}
+.dv-root .dv-settings-panel{max-width:460px}
+.dv-root .dv-settings-tabs{display:flex;gap:6px;flex-shrink:0}
+.dv-root .dv-settings-tabs button{flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--dsw-border-secondary,#d8d8d8);background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.dv-root .dv-settings-tabs button.is-active{border-color:var(--dsw-alias-brand-primary,#82c8cf);font-weight:600}
+.dv-root .dv-settings-body{display:flex;flex-direction:column;gap:8px;min-height:0}
+.dv-root .dv-settings-help,.dv-root .dv-settings-fixed{margin:0;font-size:11.5px;opacity:.8;line-height:1.5}
+.dv-root .dv-settings-fixed{padding:6px 8px;border-radius:8px;background:var(--dsw-fill-quaternary,#f2f2f2)}
+.dv-root .dv-settings-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;overflow:auto;min-height:0}
+.dv-root .dv-settings-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--dsw-border-secondary,#e0e0e0);border-radius:9px}
+.dv-root .dv-settings-list li[data-default="true"]{border-color:var(--dsw-alias-brand-primary,#82c8cf)}
+.dv-root .dv-settings-item-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dv-root .dv-settings-item-main strong{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-root .dv-settings-item-main small{font-size:11px;opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-root .dv-settings-item-main .dv-settings-url{font-family:ui-monospace,Consolas,monospace}
+.dv-root .dv-settings-badge{font-style:normal;font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-fill-tertiary,#eee);width:max-content}
+.dv-root .dv-settings-item-actions{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.dv-root .dv-settings-item-actions .dv-button{font-size:11px;padding:3px 7px}
+.dv-root .dv-settings-form{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--dsw-border-secondary,#e0e0e0);border-radius:10px;flex-shrink:0}
+.dv-root .dv-settings-form label{display:flex;align-items:center;gap:6px;font-size:11.5px}
+.dv-root .dv-settings-form input,.dv-root .dv-settings-form select{flex:1;min-width:0;font-size:12px;padding:4px 7px;border-radius:7px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit}
+.dv-root .dv-settings-form-actions{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.dv-root .dv-settings-count{margin-right:auto;font-size:11px;opacity:.7}
+.dv-root .dv-settings-prompt{width:100%;box-sizing:border-box;font-size:12px;line-height:1.5;padding:7px 9px;border-radius:9px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit;resize:vertical;font-family:inherit}
+.dv-root .dv-settings-add{align-self:flex-start}
+.dv-root .dv-settings-notice{margin:0;min-height:16px;font-size:11.5px;color:var(--dsw-alias-brand-primary,#3f9a95)}
+.dv-root .dv-range-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--dsw-border-secondary,#e4e4e4);font-size:12px;flex-shrink:0}
+.dv-root .dv-range-bar strong{font-size:12px}
+.dv-root .dv-range-label{opacity:.8;font-size:11.5px}
+.dv-root .dv-range-bar input[type="number"]{width:74px;font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit}
+.dv-root .dv-range-bar .dv-button{font-size:11px;padding:3px 8px}
+.dv-root .dv-timeline-range{position:absolute;top:26px;bottom:0;z-index:6;pointer-events:none;background:color-mix(in srgb,var(--dsw-alias-brand-primary,#82c8cf) 18%,transparent);border-left:2px solid var(--dsw-alias-brand-primary,#5fb7b0);border-right:2px solid var(--dsw-alias-brand-primary,#5fb7b0)}
+.dv-root .dv-timeline-range[data-draft="true"]{opacity:.75}
+.dv-root .dv-timeline[data-range-mode="true"] .dv-timeline-ruler{cursor:crosshair}
+.dv-root .dv-timeline[data-range-mode="true"] .dv-playhead-handle{pointer-events:none}
+.dv-root .dv-settings-toggle svg{opacity:.85}
+.dv-root .dv-range-tool[aria-pressed="true"]{color:var(--dsw-alias-brand-primary,#3f9a95);border-color:var(--dsw-alias-brand-primary,#82c8cf)}
+.dv-root .dv-button-danger{color:#b3261e;border-color:#e2a9a4}
 .dv-root .dv-drawer.dv-media-library{top:52px;left:12px;width:min(352px,calc(100% - 24px));max-height:min(580px,calc(100% - 68px))}
 .dv-root .dv-reference-toggle{margin:0;align-self:auto;width:auto;display:inline-flex;gap:5px;padding:0 8px;font-size:12px}
 .dv-root .dv-reference-head,.dv-root .dv-drawer-head{display:flex;align-items:center;gap:8px;font-size:13px;min-height:28px;flex-shrink:0}
@@ -2315,6 +2444,34 @@ window.__ModuleLoader__.load({
         '`'
       );
     }
+    /**
+     * The timeline panel's current free range selection, page-registered for
+     * the native @ menu. Only the user's own selection is offered; worker
+     * whole-clip ranges stay filtered out. Cleared on project switch,
+     * revision change and unmount so a stale range can never be attached.
+     */
+    let activeRangeCandidate = null;
+    function setActiveRangeCandidate(next) {
+      activeRangeCandidate =
+        next && REFERENCE_TOKEN.test(next.token) && /^range$/.test(next.kind)
+          ? next
+          : null;
+    }
+    function activeRangeItem(query) {
+      const item = activeRangeCandidate;
+      if (item === null) return null;
+      const q = String(query || '').trim().toLowerCase();
+      if (q.length > 0 && (item.label + ' ' + item.description).toLowerCase().indexOf(q) < 0)
+        return null;
+      return {
+        name: item.label,
+        label: item.label,
+        description: item.description,
+        icon: 'file',
+        section: '当前时间范围',
+        value: JSON.stringify({ token: item.token, label: item.label, kind: 'range' }),
+      };
+    }
     function createReferenceSource(request) {
       return {
         trigger: '@',
@@ -2341,12 +2498,12 @@ window.__ModuleLoader__.load({
             );
             if (req.signal?.aborted) return [];
             // Native @ is a concise object picker. Scene aliases and generated
-            // whole-clip ranges repeat the same target; custom ranges stay in
-            // ReferencePanel. The underlying tokens/resolve contract is unchanged.
-            return (result.items || [])
+            // whole-clip ranges repeat the same target; the user's current
+            // free range selection is offered first as "当前时间范围".
+            // The underlying tokens/resolve contract is unchanged.
+            const list = (result.items || [])
               .filter(x => REFERENCE_TOKEN.test(x.token) && ['clip','asset'].includes(x.kind))
               .sort((a,b) => (a.kind === 'asset') - (b.kind === 'asset'))
-              .slice(0, 50)
               .map(x => {
                 const clean = value => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
                 const detail = clean(x.detail);
@@ -2365,6 +2522,11 @@ window.__ModuleLoader__.load({
                   value: JSON.stringify({token:x.token,label,kind:x.kind}),
                 };
               });
+            const current = activeRangeItem(req.query);
+            const merged = current === null
+              ? list
+              : [current, ...list.filter(x => x.value !== current.value)];
+            return merged.slice(0, 50);
           } catch (_error) {
             return [];
           }
@@ -4161,6 +4323,173 @@ window.__ModuleLoader__.load({
         props.hasAudio&&view?h('canvas',{ref:el=>{canvas.current=el;drawEnvelope(el);},className:'dv-clip-envelope',style:{left:view.left,width:view.right-view.left}}):null);
     }
 
+    /**
+     * Plugin settings: the ONLY place users configure music models, API keys,
+     * base URLs and the appended system prompt. The Host persists what is
+     * saved here; no file editing is ever required and keys never re-render.
+     */
+    function SettingsDialog(props) {
+      const h = React.createElement, t = props.t;
+      const panelRef = usePanelDismiss(props.onClose, 'settings');
+      const firstField = React.useRef(null);
+      const [tab, setTab] = React.useState('models');
+      const [settings, setSettings] = React.useState(null);
+      const [promptText, setPromptText] = React.useState('');
+      const [promptMax, setPromptMax] = React.useState(2000);
+      const [promptLoaded, setPromptLoaded] = React.useState(false);
+      const [draft, setDraft] = React.useState(null);
+      const [keyOpen, setKeyOpen] = React.useState(false);
+      const [keyInput, setKeyInput] = React.useState('');
+      const [confirmRemove, setConfirmRemove] = React.useState(null);
+      const [notice, setNotice] = React.useState('');
+      const [busy, setBusy] = React.useState(false);
+      React.useEffect(() => { if (draft || keyOpen) firstField.current?.focus(); }, [draft, keyOpen]);
+      React.useEffect(() => {
+        let stopped = false;
+        hostRequest('audio.settings', {}).then(r => { if (!stopped) setSettings(r); }).catch(e => { if (!stopped) setNotice(errorText(hostError(e), t)); });
+        hostRequest('prompt.get', {}).then(r => { if (!stopped) { setPromptText(typeof r.text === 'string' ? r.text : ''); setPromptMax(Number(r.maxCharacters) || 2000); setPromptLoaded(true); } }).catch(e => { if (!stopped) setNotice(errorText(hostError(e), t)); });
+        return () => { stopped = true; };
+      }, []);
+      async function call(method, params) {
+        if (busy) return null;
+        setBusy(true); setNotice('');
+        try {
+          return await hostRequest(method, params);
+        } catch (e) {
+          setNotice(errorText(hostError(e), t));
+          return null;
+        } finally { setBusy(false); }
+      }
+      async function saveModel() {
+        if (!draft) return;
+        const model = { name: draft.name, protocol: draft.protocol, baseUrl: draft.baseUrl, remoteModel: draft.remoteModel, ...(draft.id ? { id: draft.id } : {}) };
+        const key = String(draft.apiKey || '');
+        const r = await call('audio.model.save', { model, ...(key.length > 0 ? { apiKey: key } : {}) });
+        if (r) { setSettings(r); setDraft(null); setNotice(t('video.settings.saved')); }
+      }
+      async function setDefault(modelId) {
+        const r = await call('audio.model.default', { modelId });
+        if (r) { setSettings(r); setNotice(t('video.settings.defaultSet')); }
+      }
+      async function removeModel(model) {
+        setConfirmRemove(null);
+        const r = await call('audio.model.remove', { modelId: model.id });
+        if (r) { setSettings(r); setDraft(null); setNotice(t('video.settings.removed')); }
+      }
+      async function testModel(modelId) {
+        const r = await call('audio.check', modelId ? { modelId } : {});
+        if (r) { setSettings(prev => ({ ...prev, musicModels: r.musicModels ?? prev?.musicModels, defaultMusicModelId: r.defaultMusicModelId ?? prev?.defaultMusicModelId })); setNotice(t('video.settings.testOk') + (r.note ? ' · ' + r.note : '')); }
+      }
+      async function savePrompt(text) {
+        const r = await call('prompt.set', { text });
+        if (r) { setPromptText(typeof r.text === 'string' ? r.text : ''); setNotice(text.length === 0 ? t('video.settings.promptReset') : t('video.settings.saved')); }
+      }
+      async function saveBuiltInKey() {
+        const r = await call('audio.configure', { apiKey: keyInput });
+        if (r) { setSettings(r); setKeyOpen(false); setKeyInput(''); setNotice(t('video.settings.saved')); }
+      }
+      const protocolLabel = p => p === 'qianwen-async' ? t('video.settings.protocolAsync') : t('video.settings.protocolSync');
+      return h('section', {
+        className: 'dv-reference-panel dv-settings-panel', ref: panelRef, role: 'dialog', 'aria-label': t('video.settings.title'), tabIndex: -1,
+        onKeyDown: e => { if (e.key === 'Escape') props.onClose(); },
+      },
+        h('div', { className: 'dv-reference-head' },
+          h('strong', null, t('video.settings.title')),
+          h('div', { className: 'dv-panel-actions' },
+            h('button', { className: 'dv-icon-button', 'aria-label': t('video.canvas.close'), onClick: props.onClose }, '×'),
+          ),
+        ),
+        h('div', { className: 'dv-settings-tabs', role: 'tablist' },
+          h('button', { role: 'tab', 'aria-selected': tab === 'models', className: tab === 'models' ? 'is-active' : '', onClick: () => setTab('models') }, t('video.settings.tabModels')),
+          h('button', { role: 'tab', 'aria-selected': tab === 'prompt', className: tab === 'prompt' ? 'is-active' : '', onClick: () => setTab('prompt') }, t('video.settings.tabPrompt')),
+        ),
+        tab === 'models' ? h('div', { className: 'dv-settings-body' },
+          h('p', { className: 'dv-settings-help' }, t('video.settings.modelsHelp')),
+          !settings ? h('p', { role: 'status' }, t('video.timeline.loading')) : h('ul', { className: 'dv-settings-list' },
+            (settings.musicModels || []).map(m => h('li', { key: m.id, 'data-default': m.default ? 'true' : 'false' },
+              h('div', { className: 'dv-settings-item-main' },
+                h('strong', { title: m.name }, m.name),
+                m.default ? h('em', { className: 'dv-settings-badge' }, t('video.settings.default')) : null,
+                m.builtIn ? h('em', { className: 'dv-settings-badge' }, t('video.settings.builtIn')) : null,
+                h('small', null, protocolLabel(m.protocol) + ' · ' + (m.hasKey ? t('video.settings.hasKey') : t('video.settings.noKey'))),
+                m.baseUrl ? h('small', { className: 'dv-settings-url', title: m.baseUrl }, m.baseUrl + (m.remoteModel ? ' · ' + m.remoteModel : '')) : null,
+                m.note ? h('small', null, m.note) : null,
+              ),
+              h('div', { className: 'dv-settings-item-actions' },
+                m.default ? null : h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => void setDefault(m.id) }, t('video.settings.setDefault')),
+                h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => void testModel(m.id) }, t('video.settings.test')),
+                m.builtIn ? h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => { setKeyOpen(true); setDraft(null); } }, t('video.settings.apiKey')) : h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => { setDraft({ id: m.id, name: m.name, protocol: m.protocol, baseUrl: m.baseUrl, remoteModel: m.remoteModel, apiKey: '' }); setKeyOpen(false); } }, t('video.settings.edit')),
+                m.builtIn ? null : (confirmRemove && confirmRemove.id === m.id
+                  ? h('button', { className: 'dv-button dv-button-danger', disabled: busy, onClick: () => void removeModel(m) }, t('video.settings.confirmRemove'))
+                  : h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => setConfirmRemove({ id: m.id, revision: 0 }) }, t('video.settings.remove'))),
+              ),
+            )),
+          ),
+          keyOpen ? h('div', { className: 'dv-settings-form', role: 'group', 'aria-label': t('video.settings.apiKey') },
+            h('label', null, 'API Key', h('input', { ref: firstField, type: 'password', autoComplete: 'new-password', value: keyInput, maxLength: 512, placeholder: t('video.settings.builtInKeyHelp'), onChange: e => setKeyInput(e.target.value), onKeyDown: e => { if (e.key === 'Enter' && keyInput) void saveBuiltInKey(); } })),
+            h('div', { className: 'dv-settings-form-actions' },
+              h('button', { className: 'dv-button', disabled: busy || keyInput.length === 0, onClick: () => void saveBuiltInKey() }, t('video.settings.save')),
+              h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => { setKeyOpen(false); setKeyInput(''); } }, t('video.settings.cancel')),
+            ),
+          ) : null,
+          draft ? h('div', { className: 'dv-settings-form', role: 'group', 'aria-label': draft.id ? t('video.settings.edit') : t('video.settings.add') },
+            h('label', null, t('video.settings.name'), h('input', { ref: firstField, value: draft.name, maxLength: 80, onChange: e => setDraft({ ...draft, name: e.target.value }) })),
+            h('label', null, t('video.settings.protocol'), h('select', { value: draft.protocol, onChange: e => setDraft({ ...draft, protocol: e.target.value }) },
+              h('option', { value: 'qianwen-sync' }, t('video.settings.protocolSync')),
+              h('option', { value: 'qianwen-async' }, t('video.settings.protocolAsync')),
+            )),
+            h('label', null, 'Base URL', h('input', { value: draft.baseUrl, maxLength: 2048, placeholder: 'https://service.example.com', onChange: e => setDraft({ ...draft, baseUrl: e.target.value }) })),
+            h('label', null, t('video.settings.remoteModel'), h('input', { value: draft.remoteModel, maxLength: 128, onChange: e => setDraft({ ...draft, remoteModel: e.target.value }) })),
+            h('label', null, 'API Key', h('input', { type: 'password', autoComplete: 'new-password', value: draft.apiKey, maxLength: 512, placeholder: t('video.settings.apiKeyKeep'), onChange: e => setDraft({ ...draft, apiKey: e.target.value }) })),
+            h('div', { className: 'dv-settings-form-actions' },
+              h('button', { className: 'dv-button', disabled: busy || !draft.name || !draft.baseUrl || !draft.remoteModel, onClick: () => void saveModel() }, t('video.settings.save')),
+              h('button', { className: 'dv-button dv-button-quiet', disabled: busy, onClick: () => { setDraft(null); setConfirmRemove(null); } }, t('video.settings.cancel')),
+            ),
+          ) : h('button', { className: 'dv-button dv-button-quiet dv-settings-add', disabled: busy || !settings || (settings.musicModels || []).filter(m => !m.builtIn).length >= 20, onClick: () => setDraft({ name: '', protocol: 'qianwen-sync', baseUrl: '', remoteModel: '', apiKey: '' }) }, t('video.settings.add')),
+        ) : h('div', { className: 'dv-settings-body' },
+          h('p', { className: 'dv-settings-help' }, t('video.settings.promptHelp')),
+          h('p', { className: 'dv-settings-fixed' }, t('video.settings.promptFixed')),
+          !promptLoaded ? h('p', { role: 'status' }, t('video.timeline.loading')) : h(React.Fragment, null,
+            h('textarea', { className: 'dv-settings-prompt', value: promptText, maxLength: promptMax, rows: 10, 'aria-label': t('video.settings.tabPrompt'), placeholder: t('video.settings.promptPlaceholder'), onChange: e => setPromptText(e.target.value) }),
+            h('div', { className: 'dv-settings-form-actions' },
+              h('span', { className: 'dv-settings-count' }, String(promptText.length) + ' / ' + String(promptMax)),
+              h('button', { className: 'dv-button', disabled: busy, onClick: () => void savePrompt(promptText) }, t('video.settings.save')),
+              h('button', { className: 'dv-button dv-button-quiet', disabled: busy || promptText.length === 0, onClick: () => void savePrompt('') }, t('video.settings.promptReset')),
+            ),
+          ),
+        ),
+        h('p', { role: 'status', className: 'dv-settings-notice' }, notice),
+      );
+    }
+
+    /** Clipboard helper for panels outside the main component scope. */
+    async function copyTextLocally(value) {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(value);
+          return true;
+        }
+      } catch (_error) {
+        /* fall through to the legacy path */
+      }
+      try {
+        if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+          const area = document.createElement('textarea');
+          area.value = value;
+          area.setAttribute('readonly', 'readonly');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.documentElement.appendChild(area);
+          area.select();
+          const ok = document.execCommand('copy');
+          document.documentElement.removeChild(area);
+          return ok;
+        }
+      } catch (_error) {
+        /* clipboard unavailable */
+      }
+      return false;
+    }
     function TimelinePanel(props) {
       const h = React.createElement,
         t = props.t;
@@ -4176,14 +4505,20 @@ window.__ModuleLoader__.load({
         [levelDrafts,setLevelDrafts]=React.useState({}),
         [snap, setSnap] = React.useState(true),
         [drag, setDrag] = React.useState(null),
-        [scrub,setScrub]=React.useState(null);
+        [scrub,setScrub]=React.useState(null),
+        [rangeMode,setRangeMode]=React.useState(false),
+        [range,setRange]=React.useState(null),
+        [rangeDraft,setRangeDraft]=React.useState(null),
+        [rangeFrom,setRangeFrom]=React.useState(''),
+        [rangeTo,setRangeTo]=React.useState('');
       const [recovery,setRecovery]=React.useState(null);
       const [selectedTrack,setSelectedTrack]=React.useState(null),[removeTrack,setRemoveTrack]=React.useState(null),[trackContext,setTrackContext]=React.useState(null),[clipContext,setClipContext]=React.useState(null);
       const gutter=156;
       const waves=React.useRef(new Set());
       const alive = React.useRef(true),
         current = React.useRef(null),
-        viewport = React.useRef(null),timelineRef=React.useRef(null),rulerRef=React.useRef(null),scrubRef=React.useRef(null),gestureRef=React.useRef(null),laneRefs=React.useRef(new Map()),gestureMoved=React.useRef(false);
+        viewport = React.useRef(null),timelineRef=React.useRef(null),rulerRef=React.useRef(null),scrubRef=React.useRef(null),gestureRef=React.useRef(null),laneRefs=React.useRef(new Map()),gestureMoved=React.useRef(false),rangeRef=React.useRef(null),rangeModeRef=React.useRef(false);
+      rangeModeRef.current=rangeMode;
       React.useEffect(() => {
         alive.current = true;
         return () => {
@@ -4333,7 +4668,18 @@ window.__ModuleLoader__.load({
           ]);
         }
       }, [props.assetToAdd, data, busy, recovery]);
-      React.useEffect(()=>{setLevelDrafts({});gestureRef.current=null;setDrag(null);if(scrubRef.current)finishScrub();},[data?.revision]);
+      React.useEffect(()=>{setLevelDrafts({});gestureRef.current=null;setDrag(null);if(scrubRef.current)finishScrub();cancelRange();
+        // A range belongs to one exact project/revision pair. Any change
+        // invalidates it; the stale selection is never applied silently.
+        if(range){setRange(null);setRangeFrom('');setRangeTo('');}
+        setActiveRangeCandidate(null);
+      },[data?.revision]);
+      React.useEffect(()=>{
+        setRange(null);setRangeFrom('');setRangeTo('');cancelRange();
+        setActiveRangeCandidate(null);
+        return ()=>{setActiveRangeCandidate(null);};
+      },[props.projectId]);
+      React.useEffect(()=>{if(!rangeDraft)return;const view=timelineRef.current?.ownerDocument.defaultView;const stop=()=>cancelRange();view?.addEventListener('blur',stop);let raf;const scroll=()=>{const g=rangeRef.current,el=viewport.current;if(g&&el){const r=el.getBoundingClientRect(),x=g.clientX;const delta=x<r.left+gutter+24?-Math.min(18,Math.ceil((r.left+gutter+24-x)/2)):x>r.right-24?Math.min(18,Math.ceil((x-r.right+24)/2)):0;const before=el.scrollLeft;if(delta){el.scrollLeft+=delta;if(before!==el.scrollLeft)moveRange(x);}}raf=requestAnimationFrame(scroll);};raf=requestAnimationFrame(scroll);return()=>{cancelAnimationFrame(raf);view?.removeEventListener('blur',stop);};},[Boolean(rangeDraft)]);
       React.useEffect(()=>{if(!scrub)return;const view=timelineRef.current?.ownerDocument.defaultView;const stop=()=>finishScrub();view?.addEventListener('blur',stop);let raf;const scroll=()=>{const g=scrubRef.current,el=viewport.current;if(g&&el){const r=el.getBoundingClientRect(),x=g.clientX;const delta=x<r.left+gutter+24?-Math.min(18,Math.ceil((r.left+gutter+24-x)/2)):x>r.right-24?Math.min(18,Math.ceil((x-r.right+24)/2)):0;const before=el.scrollLeft;if(delta){el.scrollLeft+=delta;if(before!==el.scrollLeft)moveScrub(x);}}raf=requestAnimationFrame(scroll);};raf=requestAnimationFrame(scroll);return()=>{cancelAnimationFrame(raf);view?.removeEventListener('blur',stop);};},[Boolean(scrub)]);
       // Keep Escape within this timeline even when selecting a clip inserts toolbar controls.
       React.useEffect(()=>{if(drag)timelineRef.current?.focus({preventScroll:true});},[drag]);
@@ -4396,6 +4742,61 @@ window.__ModuleLoader__.load({
         scrubRef.current=g;setScrub(g);props.onScrubStart?.();
         timelineRef.current?.focus({preventScroll:true});timelineRef.current?.setPointerCapture(e.pointerId);
         moveScrub(e.clientX);
+      }
+      // ── Range selection (框选配乐): ruler drag in range mode ──
+      function rangeFrame(clientX){
+        const ruler=rulerRef.current;if(!ruler)return 0;
+        const rect=ruler.getBoundingClientRect();
+        return Math.max(0,Math.min(duration,Math.round((clientX-rect.left)/zoom*30)));
+      }
+      function startRange(e) {
+        if(e.button!==0||gestureRef.current||scrubRef.current||rangeRef.current)return;
+        e.preventDefault();e.stopPropagation();
+        const f=rangeFrame(e.clientX);
+        const g={pointerId:e.pointerId,anchor:f,fromFrame:f,toFrame:f,clientX:e.clientX};
+        rangeRef.current=g;setRangeDraft(g);
+        timelineRef.current?.focus({preventScroll:true});timelineRef.current?.setPointerCapture(e.pointerId);
+      }
+      function moveRange(clientX) {
+        const g=rangeRef.current;if(!g)return;
+        const f=rangeFrame(clientX);
+        const next={...g,clientX,fromFrame:Math.min(g.anchor,f),toFrame:Math.max(g.anchor,f)};
+        rangeRef.current=next;setRangeDraft(next);
+      }
+      function cancelRange() {
+        const g=rangeRef.current;if(!g)return;
+        rangeRef.current=null;setRangeDraft(null);
+        const node=timelineRef.current;if(node?.hasPointerCapture?.(g.pointerId))node.releasePointerCapture(g.pointerId);
+      }
+      function finishRange() {
+        const g=rangeRef.current;if(!g)return;
+        rangeRef.current=null;setRangeDraft(null);
+        const node=timelineRef.current;if(node?.hasPointerCapture?.(g.pointerId))node.releasePointerCapture(g.pointerId);
+        // A single click keeps a minimum one-frame range; both bounds stay
+        // inside the film so scoring can never extend the project duration.
+        const from=Math.max(0,Math.min(duration-1,g.fromFrame));
+        const to=Math.min(duration,Math.max(from+1,g.toFrame));
+        commitRange({fromFrame:from,toFrame:to});
+      }
+      function commitRange(sel) {
+        const token=referenceToken(props.projectId,'range',sel.fromFrame+'-'+sel.toFrame,data.revision);
+        if(!token){setNotice(t('video.timeline.rangeInvalid'));return;}
+        const label=(t('video.timeline.rangeLabel')||'').replace('{from}',(sel.fromFrame/30).toFixed(2)).replace('{to}',(sel.toFrame/30).toFixed(2));
+        const next={...sel,token,revision:data.revision,project:props.projectId,label,description:t('video.timeline.rangeDescription')};
+        setRange(next);setRangeFrom((sel.fromFrame/30).toFixed(2));setRangeTo((sel.toFrame/30).toFixed(2));
+        setActiveRangeCandidate(next);
+        setNotice(t('video.timeline.rangeReady'));
+      }
+      function applyRangeInputs() {
+        const a=Math.round(Number(rangeFrom)*30),b=Math.round(Number(rangeTo)*30);
+        if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<=a||b>duration){setNotice(t('video.timeline.rangeInvalid'));return;}
+        commitRange({fromFrame:a,toFrame:b});
+      }
+      function clearRange() {setRange(null);setRangeFrom('');setRangeTo('');setActiveRangeCandidate(null);}
+      async function copyRangeReference(mode) {
+        if(!range)return;
+        const ok=await copyTextLocally(referenceText(range.token));
+        setNotice(t(ok?mode==='add'?'video.timeline.rangeAdded':'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
       }
       function seekAtLane(clientX,lane){
         if(!lane)return;
@@ -4485,14 +4886,17 @@ window.__ModuleLoader__.load({
           'data-duration-mode':data.settings.durationMode,
           'data-duration-frames':duration,
           'data-scrubbing':scrub?'true':'false',
-          onPointerMove:e=>{if(scrubRef.current){if(e.pointerId===scrubRef.current.pointerId){e.preventDefault();moveScrub(e.clientX);}}else pointerMove(e);},
-          onPointerUp:e=>{if(scrubRef.current){if(e.pointerId===scrubRef.current.pointerId){moveScrub(e.clientX);finishScrub();}return;}const c=clips.find(c=>c.clipId===gestureRef.current?.clipId);if(c)pointerUp(e,c);},
-          onPointerCancel:()=>{finishScrub();gestureMoved.current=true;gestureRef.current=null;setDrag(null);},
-          onLostPointerCapture:()=>{finishScrub();gestureRef.current=null;setDrag(null);},
+          'data-range-mode':rangeMode?'true':'false',
+          'data-range-selecting':(rangeDraft||range)?'true':'false',
+          onPointerMove:e=>{if(rangeRef.current){if(e.pointerId===rangeRef.current.pointerId){e.preventDefault();moveRange(e.clientX);}}else if(scrubRef.current){if(e.pointerId===scrubRef.current.pointerId){e.preventDefault();moveScrub(e.clientX);}}else pointerMove(e);},
+          onPointerUp:e=>{if(rangeRef.current){if(e.pointerId===rangeRef.current.pointerId){moveRange(e.clientX);finishRange();}return;}if(scrubRef.current){if(e.pointerId===scrubRef.current.pointerId){moveScrub(e.clientX);finishScrub();}return;}const c=clips.find(c=>c.clipId===gestureRef.current?.clipId);if(c)pointerUp(e,c);},
+          onPointerCancel:()=>{cancelRange();finishScrub();gestureMoved.current=true;gestureRef.current=null;setDrag(null);},
+          onLostPointerCapture:()=>{cancelRange();finishScrub();gestureRef.current=null;setDrag(null);},
           onBlur:e=>{if(scrubRef.current&&!e.currentTarget.contains(e.relatedTarget))finishScrub();if(drag&&!e.currentTarget.contains(e.relatedTarget)){gestureMoved.current=true;gestureRef.current=null;setDrag(null);}},
           "aria-label": t("video.timeline.title"),"aria-busy":busy?"true":"false",
           tabIndex: 0,
           onKeyDown: (e) => {
+            if(rangeRef.current){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelRange();}return;}
             if(scrubRef.current){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finishScrub(true);}return;}
             if(drag){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();gestureMoved.current=true;gestureRef.current=null;setDrag(null);}return;}
             if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT")
@@ -4595,7 +4999,20 @@ window.__ModuleLoader__.load({
           h('label',{className:'dv-snap-toggle',title:t(snap?'video.timeline.snapOn':'video.timeline.snapOff')},h('input',{type:'checkbox',checked:snap,'aria-label':t('video.timeline.snap'),onChange:e=>setSnap(e.target.checked)}),h('svg',{viewBox:'0 0 24 24',width:15,height:15,fill:'none',stroke:'currentColor',strokeWidth:1.5,'aria-hidden':true},h('path',{d:'M5 4v9a7 7 0 0 0 14 0V4h-4v9a3 3 0 0 1-6 0V4zM5 8h4m6 0h4'})),h('span',{className:'dv-snap-state','aria-hidden':true},snap?'✓':'')),
           h('input',{type:'range',className:'dv-timeline-zoom',min:1,max:100,value:Math.max(1,Math.min(100,zoom)),'aria-label':t('video.timeline.zoom'),onChange:e=>{setFit(false);setZoom(Number(e.target.value));}}),
           tool(t('video.timeline.fit'),'M8 4H4v16h4m8-16h4v16h-4M8 12h8m-6-3-3 3 3 3m4-6 3 3-3 3',()=>setFit(true),false),
+          h('button',{key:'range-tool',className:'dv-timeline-tool dv-range-tool','aria-pressed':rangeMode?'true':'false',title:t('video.timeline.rangeScore'),'aria-label':t('video.timeline.rangeScore'),onClick:()=>setRangeMode(v=>!v)},h('svg',{viewBox:'0 0 24 24',width:16,height:16,fill:'none',stroke:'currentColor',strokeWidth:1.5,'aria-hidden':true},h('path',{d:'M3 3h6v6H3zM15 15h6v6h-6zM9 6h9M6 9v9'})),h('span',{className:'dv-sr-only'},t('video.timeline.rangeScore'))),
         ),
+        range?h('div',{className:'dv-range-bar',role:'group','aria-label':t('video.timeline.rangeTitle')},
+          h('strong',null,t('video.timeline.rangeTitle')),
+          h('span',{className:'dv-range-label'},range.label),
+          h('input',{type:'number',min:0,max:duration/30,step:0.1,value:rangeFrom,'aria-label':t('video.timeline.rangeFrom'),onChange:e=>setRangeFrom(e.target.value),onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();applyRangeInputs();}}}),
+          h('span',null,'–'),
+          h('input',{type:'number',min:0,max:duration/30,step:0.1,value:rangeTo,'aria-label':t('video.timeline.rangeTo'),onChange:e=>setRangeTo(e.target.value),onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();applyRangeInputs();}}}),
+          h('span',null,'s'),
+          h('button',{className:'dv-button dv-button-quiet',onClick:applyRangeInputs},t('video.reference.range')),
+          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('add')},t('video.timeline.rangeAdd')),
+          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('copy')},t('video.timeline.rangeCopy')),
+          h('button',{className:'dv-button dv-button-quiet',onClick:clearRange},t('video.timeline.rangeClear')),
+        ):null,
         removeTrack?h(TrackDeleteConfirmation,{t,busy,name:data.tracks.find(tr=>tr.trackId===removeTrack.trackId)?.name||'',onCancel:()=>setRemoveTrack(null),onConfirm:()=>{const target=removeTrack;setRemoveTrack(null);if(target.revision!==data.revision){setNotice(t('video.canvas.revisionRefreshed'));return;}void write([{op:'track.remove',trackId:target.trackId,force:true}]);}}):null,
         h(
           "div",
@@ -4608,7 +5025,7 @@ window.__ModuleLoader__.load({
               {
                 className: "dv-timeline-ruler",ref:rulerRef,
                 style: { marginLeft: gutter, width },
-                onPointerDown:startScrub,
+                onPointerDown:e=>{if(rangeModeRef.current)startRange(e);else startScrub(e);},
               },
               Array.from(
                 { length: Math.min(1000, Math.ceil(duration / 30 / tickStep) + 1) },
@@ -4749,11 +5166,12 @@ window.__ModuleLoader__.load({
                   ),
                 ),
               ),
+            (rangeDraft||range)?(()=>{const sel=rangeDraft??range;return h('div',{className:'dv-timeline-range','data-draft':rangeDraft?'true':'false','aria-hidden':'true',style:{left:gutter+sel.fromFrame/30*zoom,width:Math.max(2,(sel.toFrame-sel.fromFrame)/30*zoom)}});})():null,
             drag?.lifted&&!drag.edge&&drag.valid&&drag.snapFrame!==null?h('div',{className:'dv-drop-guide','aria-hidden':true,style:{left:gutter+drag.snapFrame/30*zoom}}):null,
             h("div", {
               className: "dv-timeline-playhead",role:"slider",tabIndex:0,
               "aria-label":t("video.timeline.playhead"),"aria-valuemin":0,"aria-valuemax":duration/30,"aria-valuenow":frame/30,"aria-valuetext":formatSeconds(frame/30),
-              onPointerDown:startScrub,onKeyDown:scrubKey,
+              onPointerDown:e=>{if(rangeModeRef.current)startRange(e);else startScrub(e);},onKeyDown:scrubKey,
               style: { left: gutter + (scrub?.time??props.time) * zoom },
             },h("span",{className:"dv-playhead-handle","aria-hidden":true})),
           ),
@@ -6567,6 +6985,7 @@ window.__ModuleLoader__.load({
       const [sessionBusy, setSessionBusy] = React.useState(null);
       const [historyOpen, setHistoryOpen] = React.useState(false);
       const [referencesOpen,setReferencesOpen]=React.useState(false);
+      const [settingsOpen,setSettingsOpen]=React.useState(false);
       const [hostConversationOpen, setHostConversationOpen] = React.useState(false);
       const [retryTick, setRetryTick] = React.useState(0);
       const [sessionDiagnostic, setSessionDiagnostic] = React.useState(null);
@@ -7936,7 +8355,8 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'dv-ai-actions' },
-              h('button',{className:'dv-reference-toggle dv-icon-button','data-panel-trigger':'references',disabled:!projectId,'aria-haspopup':'dialog','aria-label':t('video.reference.title'),title:t('video.reference.title'),'aria-expanded':referencesOpen,onClick:()=>{setReferencesOpen(!referencesOpen);setHistoryOpen(false);}},h(StudioIcon,{name:'reference'}),h('span',null,t('video.reference.title'))),
+              h('button',{className:'dv-icon-button dv-settings-toggle','data-panel-trigger':'settings','aria-haspopup':'dialog','aria-label':t('video.settings.title'),title:t('video.settings.title'),'aria-expanded':settingsOpen?'true':'false',onClick:()=>{setSettingsOpen(!settingsOpen);setReferencesOpen(false);setHistoryOpen(false);}},h('svg',{viewBox:'0 0 24 24',width:18,height:18,fill:'none',stroke:'currentColor',strokeWidth:1.6,strokeLinecap:'round','aria-hidden':'true'},h('path',{d:'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 3v3.5m0 7V19.5M3 12h3.5m7 0H19.5m-3.3-4.2-2.5 2.5m-5.4 5.4-2.5 2.5m0-10.4 2.5 2.5m5.4 5.4 2.5 2.5'})),h('span',{className:'dv-sr-only'},t('video.settings.title'))),
+              h('button',{className:'dv-reference-toggle dv-icon-button','data-panel-trigger':'references',disabled:!projectId,'aria-haspopup':'dialog','aria-label':t('video.reference.title'),title:t('video.reference.title'),'aria-expanded':referencesOpen,onClick:()=>{setReferencesOpen(!referencesOpen);setHistoryOpen(false);setSettingsOpen(false);}},h(StudioIcon,{name:'reference'}),h('span',null,t('video.reference.title'))),
               h(
                 'button',
                 {
@@ -7970,6 +8390,7 @@ window.__ModuleLoader__.load({
               )
             )
           ),
+          settingsOpen?h(SettingsDialog,{key:'dsh-video-settings',t,onClose:()=>setSettingsOpen(false)}):null,
           referencesOpen?h(ReferencePanel,{key:projectId,projectId,revision:project?.revision,t,onClose:()=>setReferencesOpen(false)}):null,
           historyOpen ? historyMenu() : null,
           h('div', { className: 'dv-ai-body' }, body),

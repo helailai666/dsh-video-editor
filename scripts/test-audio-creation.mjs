@@ -41,6 +41,25 @@ try{
  t=await call('timeline.inspect');const updated=t.tracks.find(x=>x.trackId===tr.trackId).clips[0];assert.equal(updated.clipId,clip.clipId);assert.equal(updated.volumeDb,-6);assert.equal(updated.fadeOutFrames,9);assert.equal(updated.durationFrames,120);checks++;
  await call('timeline.undo',{expectedRevision:t.revision,operationId:'undo-score-replace'});t=await call('timeline.inspect');assert.equal(t.tracks.find(x=>x.trackId===tr.trackId).clips[0].assetId,j.asset.assetId);checks++;
  await call('timeline.redo',{expectedRevision:t.revision,operationId:'redo-score-replace'});t=await call('timeline.inspect');assert.equal(t.tracks.find(x=>x.trackId===tr.trackId).clips[0].assetId,revised.asset.assetId);checks++;
+ // ── Strict range scoring: exact selection insert, short asset stays unplaced, no extension ──
+ t=await call('timeline.inspect');const filmFrames=t.settings.durationFrames;const from=Math.floor(filmFrames/2),to=filmFrames,span=to-from;
+ const audioCount=()=>t.tracks.filter(x=>x.kind==='audio').length;
+ if(audioCount()<3){await call('timeline.apply',{expectedRevision:t.revision,operationId:'add-scoring-track',ops:[{op:'track.add',kind:'audio',name:'选区配乐'}]});t=await call('timeline.inspect');}
+ const scoringTrack=t.tracks.find(x=>x.kind==='audio'&&x.trackId!==tr.trackId&&!x.locked&&x.clips.length===0)||t.tracks.find(x=>x.kind==='audio'&&x.clips.length===0);
+ if(!scoringTrack){await call('timeline.apply',{expectedRevision:t.revision,operationId:'free-scoring-track',ops:[{op:'clip.delete',clipId:t.tracks.find(x=>x.kind==='audio').clips[0].clipId,ripple:false}]});t=await call('timeline.inspect');}
+ const freeTrack=(await call('timeline.inspect')).tracks.find(x=>x.kind==='audio'&&x.clips.length===0);
+ const scoped=await call('timeline.apply',{expectedRevision:t.revision,operationId:'score-range-exact',ops:[{op:'clip.insert',assetId:j.asset.assetId,trackId:freeTrack.trackId,startFrame:from,durationFrames:span,sourceInFrame:0,mode:'reject'}]});
+ assert.equal(scoped.written,true);checks++;
+ t=await call('timeline.inspect');const placedRange=t.tracks.find(x=>x.trackId===freeTrack.trackId).clips[0];
+ assert.equal(placedRange.startFrame,from);assert.equal(placedRange.durationFrames,span);
+ assert.equal(t.settings.durationFrames,filmFrames,'scoring inside the selection never extends the film');checks++;
+ const overlapBefore=JSON.stringify(t.tracks.map(x=>x.clips.map(c=>[c.clipId,c.startFrame,c.durationFrames])));
+ await assert.rejects(()=>call('timeline.apply',{expectedRevision:t.revision,operationId:'score-range-clash',ops:[{op:'clip.insert',assetId:j.asset.assetId,trackId:freeTrack.trackId,startFrame:from+6,durationFrames:span,sourceInFrame:0,mode:'reject'}]}));checks++;
+ const shortJob=await wait(await call('audio.generate',{provider:'procedural',kind:'music',text:'短素材',score:{duration:1,events:[{sound:'bell',at:0,duration:0.5,note:60}]},operationId:'short-range-asset'}));
+  t=await call('timeline.inspect');
+  await assert.rejects(()=>call('timeline.apply',{expectedRevision:t.revision,operationId:'short-over-range',ops:[{op:'clip.insert',assetId:shortJob.asset.assetId,trackId:freeTrack.trackId,startFrame:0,durationFrames:span,sourceInFrame:0,mode:'reject'}]}));checks++;
+ assert.equal(JSON.stringify((await call('timeline.inspect')).tracks.map(x=>x.clips.map(c=>[c.clipId,c.startFrame,c.durationFrames]))),overlapBefore,'rejected scoring attempts never move or overwrite existing clips');checks++;
+ await assert.rejects(async()=>call('timeline.apply',{expectedRevision:(await call('timeline.inspect')).revision,operationId:'fourth-audio-track',ops:[{op:'track.add',kind:'audio'}]}));checks++;
  const render=await call('render',{revision:t.revision});let rendered;const deadline=Date.now()+120000;
  do{await new Promise(r=>setTimeout(r,100));rendered=(await tool.execute({action:'status',jobId:render.jobId},exec)).result;assert(Date.now()<deadline);}while(['queued','running'].includes(rendered.state));
  assert.equal(rendered.state,'succeeded',JSON.stringify(rendered));

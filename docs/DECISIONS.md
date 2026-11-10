@@ -12,7 +12,9 @@
 | Host 边界 | 路径、工程/Session 归属与资源限制由可信 Host 校验；[ADR-0002](adr/0002-host-bridge-runtime-and-boundaries.md)。 |
 | 预览 | 固定 revision 快照；失败保留上一有效画面，迟到结果不覆盖新版本。 |
 | 数据稳定 | 用户工程保存在稳定数据根；更新替换插件，不覆盖作品。 |
-| 音频入口 | AI 生成后直接上轨；用户上传进素材；不提供独立供应商设置面板。 |
+| 音频入口 | AI 生成后直接上轨；用户上传进素材；音乐模型、API Key 与追加系统提示词只在插件设置页配置（Host 内部持久化，非文件配置入口），Tool 不得接触凭据。 |
+| 配乐模型协议 | 自定义服务首版支持 qianwen-sync/qianwen-async 两种兼容协议，仅公网 HTTPS；异步任务先持久化 task ID，重启只恢复查询，绝不重复计费提交。 |
+| 选区配乐 | 时间线框选精确范围注册为原生 `@` range 引用；上轨严格匹配选区（裁到 targetFrames、不循环、不 ripple、不覆盖、不延长影片），短素材保留素材库不上轨。 |
 | 安装与发布 | GitHub 源码、npm 和 Release 包均使用完整引擎及依赖；安装时不运行插件构建脚本。公开发布状态读 STATUS。 |
 
 协作与权限只维护在 [DEVELOPMENT](DEVELOPMENT.md)。

@@ -20,6 +20,7 @@
 - 预览绑定固定 revision；失败保留上一画面，迟到结果不覆盖新作品。生成代码不在 Host 主进程执行；iframe/CSP 不等于系统级沙箱。
 - 工程内容仅由受控 worker 写入，Session/工程归属、路径与资源上限在 Host 校验。
 - npm 包名、Loader 行与客户端模块 id 为 `dsh-video-editor`；稳定 UI key、API 路由和用户数据目录保留 `dsh-video`，避免破坏旧工程。旧本机 link 包在正式迁移前保留，不同时启用旧包与新包。
+- 音乐模型与追加系统提示词的唯一用户入口是插件设置页；`<dataRoot>/plugin-settings.json` 与 `<dataRoot>/audio/audio-secrets.json`（含 models 段）只是页面保存后的 Host 内部持久化，不是配置方式。Key/Base URL/提示词不经聊天 Tool 读写；自定义服务仅公网 HTTPS，每次请求前校验 URL 与 DNS，下载不带凭据；损坏的设置文件保留并报错，不静默重置。
 
 ## 打包与验证
 

@@ -1181,8 +1181,13 @@ export class Timelines {
               c.startFrame + c.durationFrames > ref.fromFrame,
           );
         } else fail("E_PARAMS", "Unknown reference kind");
+        // A validated range names a time interval, not a clip set: an empty
+        // interval is resolved with zero candidates (scoring a gap between
+        // clips is a legitimate target). Other kinds keep missing/ambiguous.
         const status = !matches.length
-          ? "missing"
+          ? ref.kind === "range"
+            ? "resolved"
+            : "missing"
           : (ref.kind === "label" || ref.kind === "index") && matches.length > 1
             ? "ambiguous"
             : "resolved";

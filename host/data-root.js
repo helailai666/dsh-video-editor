@@ -152,6 +152,7 @@ export function dataRootLayout(root) {
     sessionCwd: join(root, 'session-cwd'),
     sessionStatePath: join(root, 'session-state.json'),
     uiStatePath: join(root, 'ui-state.json'),
+    pluginSettingsPath: join(root, 'plugin-settings.json'),
     migrationPath: join(root, 'migration.json'),
   };
 }

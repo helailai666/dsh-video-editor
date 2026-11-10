@@ -28,11 +28,14 @@ import { readPreviewFile } from './preview.js';
 import { AssetInbox, ASSET_UPLOAD_ROUTE } from './asset-inbox.js';
 import { SnapshotRoutes, SNAPSHOT_ROUTE_BASE } from './snapshot.js';
 import { UiStateStore } from './ui-state.js';
+import { PluginSettingsStore } from './plugin-settings.js';
 import { dataRootLayout, ensureDataRoot, legacyRootsFromConfig, loadManagedProjects, migrateLegacyRoots, quarantineCorruptFile, readWorkerRegistry, repairProjectsRegistry, resolveDataRoot, scanProjectsRoot, writeProjectsBackup } from './data-root.js';
 
 export const REQUEST_METHODS = Object.freeze([
 'reference.list', 'timeline.references', 'timeline.visuals.request', 'timeline.visuals.status', 'timeline.visuals.cancel',
 'audio.guide','audio.recipe','audio.providers','audio.settings','audio.configure','audio.check','audio.generate','audio.status','audio.cancel',
+'audio.model.save','audio.model.remove','audio.model.default',
+'prompt.get','prompt.set',
 'timeline.inspect',
 'timeline.apply',
 'timeline.resolve',
@@ -86,8 +89,13 @@ const METHOD_PARAMS = Object.freeze({
 'audio.providers': ['projectId'],
 'audio.settings': [],
 'audio.configure': ['apiKey'],
-'audio.check': [],
-'audio.generate': ['projectId', 'operationId', 'provider', 'kind', 'text', 'voice', 'rate', 'score'],
+'audio.check': ['modelId'],
+'audio.model.save': ['model', 'apiKey'],
+'audio.model.remove': ['modelId'],
+'audio.model.default': ['modelId'],
+'prompt.get': [],
+'prompt.set': ['text'],
+'audio.generate': ['projectId', 'operationId', 'provider', 'kind', 'text', 'voice', 'rate', 'score', 'modelId', 'durationFrames'],
 'audio.status': ['projectId', 'jobId'],
 'audio.cancel': ['projectId', 'jobId'],
 
@@ -155,6 +163,7 @@ const MAX_REGISTRY_BYTES = 1024 * 1024;
 const SNAPSHOT_ID = /^[a-f0-9]{32}$/;
 const TEMPLATE_ID = 'product-launch-v1';
 const SCENE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const AUDIO_MODEL_ID = /^(qianwen|music_[a-f0-9]{16})$/;
 /** P3-016: trimmed display-title bound shared with the worker manifest contract. */
 const PROJECT_TITLE_MAX = 120;
 /** Bounded advisory read of one worker-owned `project.json`; never throws. */
@@ -478,7 +487,21 @@ export function validateParams(config, method, params) {
     if(method==='audio.generate')next.operationId=operationId(params.operationId);
     if(params.jobId!==undefined&&(typeof params.jobId!=='string'||!/^audio_[a-f0-9-]{36}$/.test(params.jobId)))fail('E_PARAMS','Invalid audio job id');
     if(['audio.cancel','audio.recipe'].includes(method)&&!params.jobId)fail('E_PARAMS','Provide audio job id');
+    if(params.modelId!==undefined&&(typeof params.modelId!=='string'||!AUDIO_MODEL_ID.test(params.modelId)))fail('E_PARAMS','Invalid audio model id','params');
+    if(params.durationFrames!==undefined&&(Number.isInteger(params.durationFrames)===false||params.durationFrames<1||params.durationFrames>108000))fail('E_PARAMS','Invalid durationFrames','params');
+    if(method.startsWith('audio.model.')){
+      if(method==='audio.model.save'){
+        if(isPlainObject(params.model)===false)fail('E_PARAMS','Invalid music model payload','params');
+        if(params.apiKey!==undefined&&(typeof params.apiKey!=='string'||params.apiKey.length>512||/[\r\n]/.test(params.apiKey)))fail('E_PARAMS','Invalid API key','params');
+      } else if(!params.modelId)fail('E_PARAMS','Provide audio model id','params');
+      return next;
+    }
     return next;
+  }
+  if (method === 'prompt.get') return {};
+  if (method === 'prompt.set') {
+    if (typeof params.text !== 'string' || params.text.length > 4096 || params.text.includes('\0')) fail('E_PARAMS', 'Invalid prompt text', 'params');
+    return { text: params.text };
   }
   if (method === 'doctor') return {};
   if (method === 'open' || method === 'inspect' || method === 'close') {
@@ -910,6 +933,7 @@ export class VideoBridge {
     let sessionConfig = this.config;
     let assetInboxRoot = this.config === null ? undefined : this.config.assetInboxRoot;
     let uiStatePath = null;
+    let pluginSettingsPath = null;
     if (this.config !== null) {
       try {
         const resolvedRoot = resolveDataRoot(this.config, process.env);
@@ -921,11 +945,20 @@ export class VideoBridge {
         });
         assetInboxRoot = layout.assetInboxRoot;
         uiStatePath = layout.uiStatePath;
+        pluginSettingsPath = layout.pluginSettingsPath;
       } catch (_error) {
         sessionConfig = this.config;
       }
     }
     this.uiState = uiStatePath === null ? null : new UiStateStore({ path: uiStatePath, logger: this.ctx && this.ctx.logger });
+    // Page-owned settings (music models + appended system prompt). The store
+    // is constructed eagerly so SessionService can read the synchronous
+    // snapshot; files are only touched on the first prepared request.
+    this.pluginSettings = pluginSettingsPath === null ? null : new PluginSettingsStore({
+      path: pluginSettingsPath,
+      logger: this.ctx && this.ctx.logger,
+    });
+    this.pluginSettingsRecovery = null;
     this.sessions = new SessionService({
       ctx: this.ctx,
       bridge: this,
@@ -995,6 +1028,16 @@ export class VideoBridge {
   }
 
   /**
+   * Synchronous read of the page-owned appended prompt for prompt assembly.
+   * Returns '' before prepare or on a corrupt file; the corrupt state is
+   * surfaced by the settings UI instead of silently rewriting defaults.
+   */
+  customSystemPromptText() {
+    if (this.pluginSettings === null || this.pluginSettings.prepared === false) return '';
+    return this.pluginSettings.customSystemPrompt();
+  }
+
+  /**
    * Ensure the stable data root once per plugin lifetime (V1 M1-01).
    *
    * Single-flight and side-effect free before the first business request, so
@@ -1018,6 +1061,17 @@ export class VideoBridge {
         } catch (error) {
           this.log(error, 'ui state prepare');
           this.uiStateRecovery = { recovered: false, error: 'E_UI_STATE_CORRUPT' };
+        }
+      }
+      // Page settings must be readable (synchronously) before the first
+      // prompt assembly; a corrupt file is surfaced, never silently reset.
+      if (this.pluginSettings !== null) {
+        try {
+          await this.pluginSettings.prepare();
+          this.pluginSettingsRecovery = null;
+        } catch (error) {
+          this.log(error, 'plugin settings prepare');
+          this.pluginSettingsRecovery = { error: error instanceof BridgeError ? error.code : 'E_SETTINGS_CORRUPT' };
         }
       }
       this.stateRecovery = await this.sessions.recoverState();
@@ -1435,6 +1489,7 @@ export class VideoBridge {
             migration: this.migrationStatus === undefined ? null : this.migrationStatus,
             sessionRecovery: this.stateRecovery === undefined ? null : this.stateRecovery,
             uiState: this.uiState === null ? null : this.uiState.diagnose(),
+            pluginSettings: this.pluginSettings === null ? null : { ...this.pluginSettings.diagnose(), recovery: this.pluginSettingsRecovery },
           },
     };
   }
@@ -1782,24 +1837,37 @@ export class VideoBridge {
       return publicResult(config.maxResultBytes,result,settings.source);
     }
     if(method.startsWith('audio.')) {
-      if(['audio.configure','audio.settings','audio.check'].includes(method)&&settings.source==='tool')throw new BridgeError('E_METHOD','Audio credentials are UI-only');
+      if(['audio.configure','audio.settings','audio.check','audio.model.save','audio.model.remove','audio.model.default'].includes(method)&&settings.source==='tool')throw new BridgeError('E_METHOD','Audio credentials are UI-only');
       if(settings.source==='tool')await this.assertToolScope(method,normalized,settings.agentSessionId);
-      if(!this.audio){const paths=this.requireDataRootPaths();this.audio=new AudioService({root:join(paths.root,'audio'),legacySecrets:join(homedir(),'.dsh/dsh-video/secrets.env'),importAudio:async(projectId,file,request)=>{
+      if(!this.audio){const paths=this.requireDataRootPaths();this.audio=new AudioService({root:join(paths.root,'audio'),settingsStore:this.pluginSettings,legacySecrets:join(homedir(),'.dsh/dsh-video/secrets.env'),importAudio:async(projectId,file,request)=>{
         const sourceName='generated-'+randomBytes(12).toString('hex')+file.slice(file.lastIndexOf('.'));
         const target=join(paths.assetInboxRoot,sourceName);await copyFile(file,target);
         try {return await this.callClient('asset.importMedia',{projectId,sourceName,name:(request.kind==='tts'?'旁白':request.kind==='music'?'配乐':'音效')+' · '+request.text.slice(0,32),limits:{maxBytes:this.config.maxAssetBytes,maxProjectBytes:this.config.maxProjectAssetBytes}});}finally{await unlink(target).catch(()=>{});}
-      }});}
+      }});void this.audio.resumeJobs().catch(error=>this.log(error,'audio resume'));}
       let result;
       if(method==='audio.configure')result=await this.audio.configure(normalized);
       else if(method==='audio.settings')result=await this.audio.settings();
-      else if(method==='audio.providers'){const s=await this.audio.settings();result={providers:s.providers,limits:s.limits,billing:s.billing};}
-      else if(method==='audio.check')result=await this.audio.check();
+      else if(method==='audio.providers'){const s=await this.audio.settings();result={models:s.musicModels.map(({baseUrl,remoteModel,hasKey,...safe})=>safe),defaultMusicModelId:s.defaultMusicModelId,providers:s.providers,limits:s.limits,billing:s.billing};}
+      else if(method==='audio.model.save')result=await this.audio.saveModel({model:normalized.model,...(normalized.apiKey!==undefined?{apiKey:normalized.apiKey}:{})});
+      else if(method==='audio.model.remove')result=await this.audio.removeModel(normalized.modelId);
+      else if(method==='audio.model.default')result=await this.audio.setDefaultModel(normalized.modelId);
+      else if(method==='audio.check')result=await this.audio.check(normalized.modelId);
       else if(method==='audio.guide')result={skill:await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8')};
       else if(method==='audio.recipe')result=await this.audio.recipe(normalized.projectId,normalized.jobId);
       else if(method==='audio.generate')result=await this.audio.generate(normalized);
       else if(method==='audio.cancel')result=await this.audio.cancel(normalized.projectId,normalized.jobId);
       else result=await this.audio.status(normalized.projectId,normalized.jobId);
       return publicResult(config.maxResultBytes,result,settings.source);
+    }
+    if (method === 'prompt.get' || method === 'prompt.set') {
+      // Page-owned prompt assembly settings: never readable or writable by
+      // the model tool surface, and never stored anywhere else.
+      if (settings.source === 'tool') throw new BridgeError('E_METHOD', 'Prompt settings are UI-only', { stage: 'params' });
+      if (this.pluginSettings === null) throw new BridgeError('E_SETTINGS_UNAVAILABLE', '插件设置存储未配置', { stage: 'plugin-settings' });
+      this.pluginSettings.ensurePrepared();
+      if (method === 'prompt.get') return { text: this.pluginSettings.customSystemPrompt(), maxCharacters: 2000, recovery: this.pluginSettingsRecovery };
+      const next = await this.pluginSettings.setCustomSystemPrompt(normalized.text);
+      return publicResult(this.requireConfig().maxResultBytes, { text: next.customSystemPrompt }, settings.source);
     }
     if (method === 'project.list') {
       if (settings.source === 'tool') throw new BridgeError('E_METHOD', 'Project listing is a UI-only action', { stage: 'params' });

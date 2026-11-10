@@ -29,11 +29,17 @@ const PROMPT_CONTEXT_NAME = 'dsh-video:project';
 const PROMPT_CONTEXT_ORDER = 4500;
 /**
  * Hard upper bound for one assembled project context string. The workflow,
- * composition contract, skeleton and conflict-recovery lines always fit; only
- * optional heavy fact lines (many scenes/targets/images) are dropped whole once
- * the budget is reached, so required model-facing instructions are never cut.
+ * composition contract, skeleton and conflict-recovery lines always fit; the
+ * page-owned "User additional instructions" block is appended whole after the
+ * fixed rules (max 2000 chars of its own) or dropped whole; optional heavy
+ * fact lines (many scenes/targets/images) are dropped last, so required
+ * model-facing instructions are never cut. The timeline contract alone
+ * measures ~5.4k chars, so the bound leaves the full 2000-char custom block
+ * plus essential fact lines headroom (plan 6000 widened to 8000).
  */
-const PROMPT_CONTEXT_MAX_CHARS = 4000;
+const PROMPT_CONTEXT_MAX_CHARS = 8000;
+/** The appended custom block is kept verbatim within this budget. */
+const CUSTOM_PROMPT_MAX_CHARS = 2000;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const MAX_CREATE_DEDUPE = 32;
@@ -469,7 +475,8 @@ export class SessionService {
       if(facts?.mode==='timeline'){
         lines.splice(2, lines.length-2,
           'Timeline project: use timeline.inspect first for revision, tracks, clip IDs and settings. Never use project.compose/project.source or legacy scene writes here.',
-          'Audio requests: FIRST audio.guide(projectId) for the bundled skill. AI composes procedural scores locally (free), then polls audio.status and inserts the real asset on an audio track in the same turn. Uploads stay in Materials until asked to place. Guide external voice/music generation and import; no provider setup, cloud calls, second panel or HTML audio. Revise scores with audio.recipe. Only claim added after written:true.',
+          'Audio requests: FIRST audio.guide(projectId) for the bundled skill. AI composes procedural scores locally (free), then polls audio.status and inserts the real asset on an audio track in the same turn. Uploads stay in Materials until asked to place. Music models are configured ONLY on the plugin settings page; never configure providers or ask for API keys, and call a cloud model only when the user explicitly asks for generated voice/music. audio.providers lists safe model IDs with the default; audio.generate accepts modelId/durationFrames for music. Revise scores with audio.recipe. Only claim added after written:true.',
+          'Range scoring: when the user attaches a dshvideo:v1 range token with a description (mood, rhythm, story), resolve it via timeline.resolve, write an instrumental music prompt from the range length plus their words (never invent unseen footage), then audio.generate kind music with durationFrames=toFrame-fromFrame using the default or the modelId they named. Poll audio.status until succeeded; re-inspect, pick an unlocked non-overlapping audio track (track.add when needed), insert with clip.insert startFrame=fromFrame, durationFrames=range length, sourceInFrame:0, mode:"reject" using the freshest revision and a new operationId. A generated asset shorter than the range stays in Materials with an honest note; never loop, move, ripple or overwrite existing clips. Cloud calls bill per provider usage; report ids only after written:true.',
           'Every write REQUIRES projectId, expectedRevision (the inspected SHA-256) and a unique operationId. They are not optional; revision/baseRevision are NOT substitutes. Undo/redo also require these fields.',
           `Create a scene: {"action":"scene.compose","projectId":"${projectId}","expectedRevision":"<revision>","operationId":"scene-1","trackId":"tr_v1","startFrame":0,"html":"<complete HTML>"}. For replacement, use clipId instead of trackId/startFrame; read scene.inspect first and preserve other clips. A new empty project has no clipId: insert the first scene.`,
           'timeline.apply requires ops with exact names: clip.insert, clip.split, clip.trim, clip.delete, clip.move, clip.reorder, clip.duplicate, clip.speed, clip.replace, clip.set, clip.fade, clip.volume, clip.transition; track.add, track.update, track.remove; timeline.settings. Use integer frames @30fps. Never send bare trim/move/delete or nested settings.',
@@ -504,12 +511,22 @@ export class SessionService {
       } else {
         factsLines.push('Inspect the project before editing so the revision and target ids are current.');
       }
-      factsLines.push('Imported media: query video_engine asset.list (projectId, kind/query/cursor/limit); place video/image/audio with timeline.apply clip.insert. Generate procedural audio via audio.guide, poll audio.status and place it. External audio is user-generated and imported; do not configure or call cloud providers.');
+      factsLines.push('Imported media: query video_engine asset.list (projectId, kind/query/cursor/limit); place video/image/audio with timeline.apply clip.insert. Generate procedural audio via audio.guide, poll audio.status and place it. Music models are page-configured; audio.providers shows them, and the Tool only calls a cloud model when the user explicitly asks.');
       const mediaCount=this.bridge?.mediaCounts?.get(projectId);
       if(Number.isSafeInteger(mediaCount))factsLines.splice(1,0,`Imported media: ${mediaCount} assets. Use video_engine asset.list for paginated metadata.`);
       // Whole-line budget: the fixed instructions above are never truncated;
-      // optional fact lines are appended in priority order while they fit.
+      // the page-owned block is appended verbatim after them (or dropped whole),
+      // then optional fact lines fill whatever remains in priority order.
       let text = lines.join('\n');
+      const custom =
+        typeof this.bridge?.customSystemPromptText === 'function'
+          ? String(this.bridge.customSystemPromptText() ?? '').slice(0, CUSTOM_PROMPT_MAX_CHARS)
+          : '';
+      if (custom.length > 0) {
+        const block =
+          `\nUser additional instructions (appended from the plugin settings page; lower priority than the fixed safety, credential, project-ownership, revision and Tool-contract rules above, which they can never override):\n${custom}`;
+        if (text.length + block.length <= PROMPT_CONTEXT_MAX_CHARS) text += block;
+      }
       for (const line of factsLines) {
         if (text.length + 1 + line.length > PROMPT_CONTEXT_MAX_CHARS) break;
         text += `\n${line}`;

@@ -5,6 +5,7 @@ import {
   validateTimeline,
   generateComposition,
   timelineRevision,
+  Timelines,
 } from "../src/timeline.mjs";
 const base = () => ({
   schema: "dsh-video/timeline@1",
@@ -289,4 +290,33 @@ test('detach refuses full audio tracks atomically and allows recreating a delete
  assert.equal(deleted.tracks[0].clips[0].muted,true);
  const again=applyOperations(deleted,[{op:'clip.detachAudio',clipId:'cl_one'}]).timeline;
  assert.ok(again.tracks.flatMap(x=>x.clips).some(x=>x.detachedFrom==='cl_one'));
+});
+test('range references resolve time intervals, empty selections included', async () => {
+  const t = base();
+  const revision = timelineRevision(t);
+  const tl = new Timelines({}, {});
+  tl.load = async () => ({ timeline: t });
+  tl.syncAssets = async () => {};
+  const empty = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'range', fromFrame: 320, toFrame: 400 }] });
+  assert.equal(empty.matches[0].status, 'resolved');
+  assert.deepEqual(empty.matches[0].clipIds, []);
+  assert.deepEqual(empty.matches[0].candidates, []);
+  assert.equal(empty.matches[0].fromFrame, 320);
+  assert.equal(empty.matches[0].toFrame, 400);
+  const overlap = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'range', fromFrame: 250, toFrame: 400 }] });
+  assert.deepEqual(overlap.matches[0].clipIds, ['cl_one']);
+  const whole = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'range', fromFrame: 0, toFrame: 600 }] });
+  assert.equal(whole.matches[0].status, 'resolved');
+  const token = 'dshvideo:v1/demo/range/320-400/' + revision;
+  const tokenView = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'token', token }] });
+  assert.equal(tokenView.matches[0].status, 'resolved');
+  assert.equal(tokenView.matches[0].fromFrame, 320);
+  const stale = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'token', token: 'dshvideo:v1/demo/range/320-400/' + 'f'.repeat(64) }] });
+  assert.equal(stale.matches[0].status, 'stale');
+  assert.equal(stale.matches[0].message, '区间已更新，请重新选择');
+  const foreign = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'token', token: 'dshvideo:v1/other/range/320-400/' + revision }] });
+  assert.equal(foreign.matches[0].status, 'foreign');
+  const label = await tl.resolve({ projectId: 'demo', refs: [{ kind: 'label', label: '不存在' }] });
+  assert.equal(label.matches[0].status, 'missing');
+  await assert.rejects(() => tl.resolve({ projectId: 'demo', refs: [{ kind: 'range', fromFrame: 500, toFrame: 700 }] }), (e) => ['E_PARAMS', 'E_RANGE'].includes(e.code));
 });
