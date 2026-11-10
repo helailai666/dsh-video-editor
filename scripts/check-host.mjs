@@ -2498,7 +2498,7 @@ async function main() {
     assert(text.includes('free-form composition'), 'the next prompt context lost the free-form composition edit path');
     // The facts-augmented (near worst-case) context still fits the budget and
     // keeps the frameImage hand-off, not only the facts-free fallback.
-    assert(text.length <= 4000, `the composition prompt context exceeds its budget: ${text.length}`);
+    assert(text.length <= 8000, `the composition prompt context exceeds its budget: ${text.length}`);
     assert(text.includes('A succeeded frame wait result includes frameImage'), 'the composition prompt context lost the frameImage hand-off');
 
     // A later inspect of the same free-form project refreshes revision + mode.
@@ -2578,7 +2578,7 @@ async function main() {
     assert(frameImageLine.includes('never use glob, ls or bash to find it'), 'the frameImage line no longer bans glob/ls/bash discovery');
     assert(frameImageLine.indexOf('frameImage') < frameImageLine.indexOf('read_image'), 'the frameImage line reads before it hands off the path');
     assert(!frameImageLine.includes('.dsh-video-frames'), 'the frameImage prompt line hard-codes the Host-created directory');
-    assert(text.length <= 4000, `the prompt context exceeds its bounded budget: ${text.length}`);
+    assert(text.length <= 8000, `the prompt context exceeds its bounded budget: ${text.length}`);
     assert(!text.includes(workspace.root) && !text.includes(workspace.projectDir), 'the prompt context leaked an absolute Host path');
     assert(!text.includes(tmpdir()), 'the prompt context leaked an OS temp path');
     assert(!text.includes(homedir()), 'the prompt context leaked the home directory or username');

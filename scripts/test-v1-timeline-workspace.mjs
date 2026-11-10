@@ -429,6 +429,46 @@ try {
   await page.mouse.move(edge.right-2,scrolled.y+12);await page.mouse.down();await page.waitForFunction(x=>document.querySelector('.dv-timeline-scroll').scrollLeft>x+8,{},edge.left);await page.mouse.up();checks++;
   await page.click('button[aria-label="适应时间线"]');await page.$eval('.dv-timeline-scroll',e=>{e.scrollLeft=0;});
 
+  // ── Range scoring selection: ruler drag, range bar, keyboard, stale clear ──
+  const rangeReadRevision=(await bridge.invoke('timeline.inspect',{projectId})).revision;
+  await page.click('button[aria-label="框选配乐"]');
+  assert.equal(await page.$eval('.dv-timeline',e=>e.dataset.rangeMode),'true');checks++;
+  await page.mouse.move(ruler.x+ruler.width*.2,ruler.y+12);await page.mouse.down();
+  await page.waitForFunction(()=>document.querySelector('.dv-timeline').dataset.rangeSelecting==='true');checks++;
+  await page.mouse.move(ruler.x+ruler.width*.5,ruler.y+12,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(()=>!!document.querySelector('.dv-range-bar'));
+  const draftRange=await page.$eval('.dv-timeline-range',e=>({left:parseFloat(e.style.left),width:parseFloat(e.style.width)}));
+  assert(draftRange.width>2&&draftRange.left>156,'range overlay must sit inside the ruler area');checks++;
+  // Ruler scrub stays paused in range mode: the playhead never moved here.
+  assert.equal((await bridge.invoke('timeline.inspect',{projectId})).revision,rangeReadRevision,'range selection writes nothing');checks++;
+  // Numeric edit to an exact 2.00-6.00 second range (frames 60-180).
+  await page.evaluate(()=>{const set=(el,v)=>{const proto=Object.getPrototypeOf(el);const desc=Object.getOwnPropertyDescriptor(proto,'value');desc.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};set(document.querySelector('.dv-range-bar input[aria-label="选区起点（秒）"]'),'2');set(document.querySelector('.dv-range-bar input[aria-label="选区终点（秒）"]'),'6');[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='区间').click();});
+  await page.waitForFunction(()=>document.querySelector('.dv-range-bar .dv-range-label').textContent.includes('2.00–6.00'));checks++;
+  const committedRange=await page.$eval('.dv-timeline-range',e=>({left:parseFloat(e.style.left),width:parseFloat(e.style.width)}));
+  assert(committedRange.width>0);checks++;
+  // Add-to-chat routes through the clipboard fallback and reports honestly.
+  await page.evaluate(()=>{const region=document.createElement('div');region.id='paste-region';region.contentEditable='true';document.body.appendChild(region);region.focus();});
+  await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='添加到聊天').click());
+  await page.waitForFunction(()=>document.querySelector('.dv-range-bar')&&[...document.querySelectorAll('.dv-timeline [role="status"]')].some(p=>p.textContent.length>0));checks++;
+  // An invalid range keeps the committed selection and warns instead of writing.
+  await page.evaluate(()=>{const set=(el,v)=>{const proto=Object.getPrototypeOf(el);const desc=Object.getOwnPropertyDescriptor(proto,'value');desc.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};set(document.querySelector('.dv-range-bar input[aria-label="选区终点（秒）"]'),'0');[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='区间').click();});
+  await page.waitForFunction(()=>[...document.querySelectorAll('.dv-timeline [role="status"]')].some(p=>p.textContent.includes('有效范围')));
+  assert.equal(await page.$eval('.dv-range-bar .dv-range-label',e=>e.textContent).includes('2.00–6.00'),true,'invalid input must not corrupt the committed range');checks++;
+  // Clearing removes the bar and overlay; a new drag recreates them.
+  await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='清除选区').click());
+  await page.waitForFunction(()=>!document.querySelector('.dv-range-bar')&&!document.querySelector('.dv-timeline-range'));checks++;
+  await page.mouse.move(ruler.x+ruler.width*.3,ruler.y+12);await page.mouse.down();await page.mouse.move(ruler.x+ruler.width*.35,ruler.y+12,{steps:4});
+  await page.keyboard.press('Escape');await page.mouse.up();
+  await page.waitForFunction(()=>document.querySelector('.dv-timeline').dataset.rangeSelecting==='false');
+  assert.equal(await page.$('.dv-range-bar'),null,'Escape cancels the in-flight range gesture without committing');checks++;
+  // Turning range mode off restores ruler scrubbing.
+  await page.click('button[aria-label="框选配乐"]');
+  assert.equal(await page.$eval('.dv-timeline',e=>e.dataset.rangeMode),'false');
+  await page.mouse.move(ruler.x+ruler.width*.2,ruler.y+12);await page.mouse.down();
+  await page.waitForFunction(()=>document.querySelector('.dv-timeline').dataset.scrubbing==='true');await page.mouse.up();checks++;
+  assert.equal((await bridge.invoke('timeline.inspect',{projectId})).revision,rangeReadRevision,'range gestures never write the project');checks++;
+
   const middle=await page.$eval('.dv-timeline-clip',e=>{const r=e.getBoundingClientRect();return {x:r.x+r.width*.6,y:r.y+r.height/2};});
   await page.mouse.click(middle.x,middle.y);
   await page.waitForFunction(()=>Math.abs(Number(document.querySelector('.dv-seek').value)-12)<.1,{timeout:3000}).catch(async e=>{console.log('click-time-debug',middle,await page.$eval('.dv-timeline',n=>({seek:document.querySelector('.dv-seek').value,head:n.querySelector('.dv-timeline-playhead').style.left,clip:n.querySelector('.dv-timeline-clip').outerHTML.slice(0,450)})));throw e;});checks++;

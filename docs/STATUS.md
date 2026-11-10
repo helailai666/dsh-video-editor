@@ -1,6 +1,16 @@
 # 当前状态
 
-更新：2026-10-25。
+更新：2026-11-10。
+
+## 分支中：设置页音乐模型、追加提示词与选区配乐
+
+`codex/music-model-range-score`（基于 main b901caf）实现并分层验证：
+
+- Host：`host/plugin-settings.js` 页面唯一设置存储（白名单、损坏保留、原子 0600、同步快照）；`audio.js` 动态模型 CRUD/密钥隔离（secrets models 段）、qianwen-sync/qianwen-async 协议、task ID 先持久化后轮询、重启只恢复查询、公网 HTTPS+DNS/重定向/下载围栏；Bridge 新增 `audio.model.*`、`prompt.*`、`audio.check{modelId}`、`audio.generate{modelId,durationFrames}`，全部 UI-only 防护到位。
+- 提示词：固定规则移除旧云禁令，追加 `User additional instructions` 块（≤2000 字符），总预算 8000（timeline 固定段实测约 5.4k，原计划 6000 会挤掉选区必需的 facts，已放宽并注释）。
+- Client：设置页（音乐模型/系统提示词两页签、不回显 Key）、时间线框选配乐模式、当前选区注册原生 `@`「当前时间范围」+ 复制引用备用；worker 合法空白 range 返回 resolved。
+- 本机（Windows）已验证：audio provider 合约（含自定义协议/恢复/SSRF 全绿）、plugin-settings 合约、model-contract 15 项、reference-client 30 项、worker timeline 18 项、smoke-client 86 项、check.mjs 54 通过/4 既有失败（与 main 基线一致）。
+- 本机无法验证（引擎 worker 明确拒绝 win32，为既有平台边界）：test-v1-audio-host、timeline-workspace 框选 E2E、audio-creation 严格选区端到端、conversation-chain——需在 macOS/Linux 环境运行后随 PR 评审补证。真实供应商（自定义同步/异步服务）与真实 DSH 端到端配乐上轨未验证，不做已验收声明。
 
 ## 1.0.0
 
