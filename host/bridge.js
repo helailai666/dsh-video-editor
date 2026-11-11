@@ -32,7 +32,7 @@ import { PluginSettingsStore } from './plugin-settings.js';
 import { dataRootLayout, ensureDataRoot, legacyRootsFromConfig, loadManagedProjects, migrateLegacyRoots, quarantineCorruptFile, readWorkerRegistry, repairProjectsRegistry, resolveDataRoot, scanProjectsRoot, writeProjectsBackup } from './data-root.js';
 
 export const REQUEST_METHODS = Object.freeze([
-'reference.list', 'timeline.references', 'timeline.visuals.request', 'timeline.visuals.status', 'timeline.visuals.cancel',
+'reference.list', 'timeline.references', 'timeline.visuals.request', 'timeline.visuals.status', 'timeline.visuals.cancel', 'timeline.audioProfile',
 'audio.guide','audio.recipe','audio.providers','audio.settings','audio.configure','audio.check','audio.generate','audio.status','audio.cancel',
 'audio.model.save','audio.model.remove','audio.model.default',
 'prompt.get','prompt.set',
@@ -103,6 +103,7 @@ const METHOD_PARAMS = Object.freeze({
 'timeline.visuals.request': ['projectId','expectedRevision','clipId','startFrame','endFrame','count'],
  'timeline.visuals.status': ['projectId','taskId'],
  'timeline.visuals.cancel': ['projectId','taskId'],
+ 'timeline.audioProfile': ['projectId','fromFrame','toFrame'],
  'timeline.inspect': ['projectId', 'view', 'trackId', 'offset', 'limit'],
 'timeline.apply': ['projectId', 'expectedRevision', 'operationId', 'ops', 'dryRun'],
 'timeline.resolve': ['projectId', 'revision', 'refs'],
@@ -476,6 +477,7 @@ export function validateParams(config, method, params) {
     return {...params};
   }
   if(method.startsWith('timeline.visuals.')) {const next={...params,projectId:allowedProject(config,params.projectId)};if(method.endsWith('request')){next.expectedRevision=revision(params.expectedRevision);if(!/^cl_[a-z0-9]+$/.test(params.clipId)||![params.startFrame,params.endFrame,params.count].every(Number.isSafeInteger)||params.startFrame<0||params.endFrame<=params.startFrame||params.count<1||params.count>4)fail('E_PARAMS','Invalid visual request');}else if(!/^[a-f0-9]{24}$/.test(params.taskId))fail('E_PARAMS','Invalid visual task');return next;}
+  if(method==='timeline.audioProfile'){const next={projectId:allowedProject(config,params.projectId)};if(!Number.isSafeInteger(params.fromFrame)||!Number.isSafeInteger(params.toFrame)||params.fromFrame<0||params.toFrame>108000||params.toFrame<=params.fromFrame)fail('E_PARAMS','Invalid audio profile range','params');next.fromFrame=params.fromFrame;next.toFrame=params.toFrame;return next;}
   if (['timeline.references','timeline.inspect','timeline.apply','timeline.resolve','timeline.undo','timeline.redo','scene.compose','scene.inspect'].includes(method)) {
     const next={...params,projectId:allowedProject(config,params.projectId)};
     if(['timeline.apply','timeline.undo','timeline.redo','scene.compose'].includes(method)){next.expectedRevision=revision(params.expectedRevision);next.operationId=operationId(params.operationId);}
@@ -1827,6 +1829,92 @@ export class VideoBridge {
     return task;
   }
 
+  /**
+   * Read-only per-bucket loudness curve of a timeline range, built from the
+   * same cached waveform envelope the UI draws: every audible unmuted clip
+   * overlapping [fromFrame,toFrame) is sampled through the existing visuals
+   * queue and the 256 window peaks are folded onto whole seconds. Range
+   * scoring uses this to feel the scene's noise without hearing the media.
+   */
+  async audioProfile(params) {
+    const { projectId, fromFrame, toFrame } = params;
+    const timeline = await this.callClient('timeline.inspect', { projectId });
+    this.rememberFacts({ ...timeline, timeline: true });
+    const revision = timeline.revision;
+    const assets = new Map(
+      (Array.isArray(timeline.assets) ? timeline.assets : []).map((a) => [a.assetId, a]),
+    );
+    const windows = [];
+    for (const track of Array.isArray(timeline.tracks) ? timeline.tracks : []) {
+      for (const clip of Array.isArray(track.clips) ? track.clips : []) {
+        const start = Math.max(clip.startFrame, fromFrame);
+        const end = Math.min(clip.startFrame + clip.durationFrames, toFrame);
+        if (end <= start) continue;
+        const asset = assets.get(clip.assetId);
+        if (!asset || (asset.kind !== 'audio' && asset.hasAudio !== true)) continue;
+        if (track.muted === true || clip.muted === true) continue;
+        windows.push({ clipId: clip.clipId, start, end });
+      }
+    }
+    if (windows.length > 16)
+      throw new BridgeError('E_LIMIT', '选区内可听片段过多，请缩短范围后重试', { stage: 'profile' });
+    const seconds = Math.ceil((toFrame - fromFrame) / 30);
+    const bucketSeconds = seconds > 600 ? Math.ceil(seconds / 600) : 1;
+    const curve = new Array(Math.ceil(seconds / bucketSeconds)).fill(0);
+    const sampled = [];
+    let unsampled = 0;
+    const deadline = Date.now() + 60000;
+    for (const window of windows) {
+      const wave = await this.sampleClipWaveform(projectId, revision, window, deadline);
+      if (!wave) { unsampled++; continue; }
+      sampled.push(window.clipId);
+      const span = window.end - window.start;
+      for (let i = 0; i < wave.peaks.length; i++) {
+        const frame = window.start + ((i + 0.5) / wave.peaks.length) * span;
+        const slot = Math.floor((frame - fromFrame) / (30 * bucketSeconds));
+        if (slot >= 0 && slot < curve.length)
+          curve[slot] = Math.max(curve[slot], Number(wave.peaks[i]) || 0);
+      }
+    }
+    return {
+      projectId,
+      fromFrame,
+      toFrame,
+      revision,
+      bucketSeconds,
+      curve: curve.map((value) => Math.round(value * 100) / 100),
+      sampledClips: sampled,
+      unsampledClips: unsampled,
+      note:
+        sampled.length === 0
+          ? 'no audible sampled audio inside the range'
+          : 'max waveform peak per bucket, 0..1 of full scale; muted tracks and silent scenes are excluded',
+    };
+  }
+  /** One visuals window -> waveform peaks, or null when it cannot be sampled. */
+  async sampleClipWaveform(projectId, revision, window, deadline) {
+    let task = await this.callClient('timeline.visuals.request', {
+      projectId,
+      expectedRevision: revision,
+      clipId: window.clipId,
+      startFrame: window.start,
+      endFrame: window.end,
+      count: 1,
+    });
+    const stop = Math.min(Date.now() + 20000, deadline);
+    while (['complete', 'failed', 'cancelled'].includes(task.status) === false) {
+      if (Date.now() > stop || this.closing === true || this.disposed === true) {
+        await this.callClient('timeline.visuals.cancel', { projectId, taskId: task.taskId }).catch(() => {});
+        return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      task = await this.callClient('timeline.visuals.status', { projectId, taskId: task.taskId });
+    }
+    if (task.status !== 'complete') return null;
+    const wave = task.result && task.result.waveform;
+    return Array.isArray(wave?.peaks) && wave.peaks.length > 0 ? wave : null;
+  }
+
   async dispatch(method, params, settings) {
     const config = this.requireConfig();
     await this.ensurePrepared();
@@ -1843,6 +1931,13 @@ export class VideoBridge {
       throw new BridgeError('E_PROJECT_UNAVAILABLE', 'The project directory is currently unavailable', { stage: 'project' });
     }
     if(method.startsWith('timeline.visuals.') && settings.source==='tool') throw new BridgeError('E_METHOD','Timeline visuals are UI-only');
+    if(method==='timeline.audioProfile'){
+      // Read-only loudness profile for range scoring; the model may call it,
+      // but the underlying visuals queue stays UI-only behind this facade.
+      if(settings.source==='tool')await this.assertToolScope(method,normalized,settings.agentSessionId);
+      const result=await this.audioProfile(normalized);
+      return publicResult(config.maxResultBytes,result,settings.source);
+    }
     if(method==='reference.list'){
       if(settings.source==='tool')throw new BridgeError('E_METHOD','Reference menu is UI-only');
       const projectId=await this.sessions.projectForSession(normalized.sessionId);
