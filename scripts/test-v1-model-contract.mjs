@@ -14,6 +14,11 @@ assert(!text.includes('no provider setup, cloud calls'),'the legacy provider-set
 assert(text.includes('configured ONLY on the plugin settings page'));
 assert(text.includes('Range scoring'));
 assert(text.includes('durationFrames=toFrame-fromFrame'));
+assert(text.includes('WITHOUT provider or score'),'range scoring must demand the page-configured cloud model');
+assert(text.includes('never substitute a procedural local score'));
+assert(text.includes('IS such an explicit request'),'the audio line must count range messages as explicit cloud asks');
+const clientSource=await readFile('client.js','utf8');
+assert(clientSource.includes("t('video.timeline.rangeRequest')"),'the sent range message must carry the explicit cloud music ask');
 assert(!text.includes('User additional instructions'),'no custom block without page settings');
 // A bound session with a custom prompt gets the block verbatim (max 2000).
 const longCustom='配乐保持器乐。'.repeat(300)+'OVERFLOW-SENTINEL'; // 1951 + sentinel > 2000

@@ -2,6 +2,15 @@
 
 更新：2026-11-11。
 
+## 分支中：选区配乐强制走配置的音乐模型
+
+基于 main 238b3f0 建 `codex/range-score-cloud-model`（待 PR）：
+
+- 背景：用户实机发送选区后，AI 被"先本地免费合成、仅明确要求才调云模型"的旧措辞带偏，用 procedural 合成了配乐，未调用设置页配置的云音乐模型。
+- `sessions.js`：Audio requests 行补注"选区条发送即显式云请求"；Range scoring 行改为 `audio.generate kind music WITHOUT provider or score`，明确必须命中页面配置模型，禁止 procedural 替代——仅当未配置模型或云调用失败才回落，且须如实说明所用路径。
+- `client.js`：发送到聊天自动附加固定请求句（新 locale key `rangeRequest`，zh/en），`rangeSent` 状态文案同步说明将调用配置的音乐模型。
+- 本机（Windows）验证：model-contract 新增 5 项断言（云请求措辞 + 消息带请求句）、audio provider 合约、plugin-settings、smoke-client 86 项、check.mjs 58/0 全绿；真实对话端到端是否改走云模型待用户实机复测。
+
 ## 分支中：DNS 围栏放行代理 fake-IP + 选区配乐携带片段摘要
 
 基于 main 450803d 建 `codex/audio-fence-proxy-ip`（待 PR）：
