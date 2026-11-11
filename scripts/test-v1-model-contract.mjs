@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {SessionService} from '../host/sessions.js';
 import {BridgeError} from '../host/errors.js';
+import {VideoBridge, validateParams} from '../host/bridge.js';
 import {createVideoTool} from '../host/tool.js';
 const revision='a'.repeat(64);
 const fake={mappingSync:()=> 'demo',bridge:{projectFacts:()=>({mode:'timeline',revision,width:1280,height:720,duration:20})}};
@@ -14,6 +15,49 @@ assert(!text.includes('no provider setup, cloud calls'),'the legacy provider-set
 assert(text.includes('configured ONLY on the plugin settings page'));
 assert(text.includes('Range scoring'));
 assert(text.includes('durationFrames=toFrame-fromFrame'));
+assert(text.includes('WITHOUT provider or score'),'range scoring must demand the page-configured cloud model');
+assert(text.includes('never substitute a procedural local score'));
+assert(text.includes('IS such an explicit request'),'the audio line must count range messages as explicit cloud asks');
+const clientSource=await readFile('client.js','utf8');
+assert(clientSource.includes("t('video.timeline.rangeRequest')"),'the sent range message must carry the explicit cloud music ask');
+// ── Range scoring stage gate: profile + table + confirmation before billing ──
+assert(text.includes('timeline.audioProfile'),'stage 1 must read the loudness curve');
+assert(text.includes('时间段（秒）'),'the user-facing table columns are fixed');
+assert(text.includes('END THE TURN'),'the prompt must wait for explicit approval before audio.generate');
+const bridgeSourceForProfile=await readFile('host/bridge.js','utf8');
+assert(bridgeSourceForProfile.includes("'timeline.audioProfile': ['projectId','fromFrame','toFrame']"),'audioProfile needs an exact parameter whitelist');
+const toolSourceForProfile=await readFile('host/tool.js','utf8');
+assert(toolSourceForProfile.includes("'timeline.audioProfile':['projectId','fromFrame','toFrame']"),'the Tool must expose audioProfile with the same fields');
+assert(bridgeSourceForProfile.includes('music-scoring-library/SKILL.md'),'audio.guide must bundle the companion genre library');
+const librarySkill=await readFile('skills/music-scoring-library/SKILL.md','utf8');
+assert(librarySkill.includes('配乐库')&&librarySkill.includes('复仇、霸总、逆袭、打脸'),'the genre table ships with the plugin');
+const creationSkill=await readFile('skills/audio-creation/SKILL.md','utf8');
+assert(creationSkill.includes('END THE TURN'),'the bundled skill keeps the confirmation gate');
+const profileConfig={projectIds:new Set(['demo'])};
+assert.deepEqual(validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120}),{projectId:'demo',fromFrame:0,toFrame:120});
+assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:5,toFrame:5}),(e)=>e.code==='E_PARAMS');
+assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120,clipId:'cl_x'}),(e)=>e.code==='E_PARAMS');
+const profileBridge=Object.create(VideoBridge.prototype);
+profileBridge.rememberFacts=()=>{};profileBridge.closing=false;profileBridge.disposed=false;
+const visualWindows=[];
+profileBridge.callClient=async(method,params)=>{
+  if(method==='timeline.inspect')return {revision:'a'.repeat(64),
+    tracks:[{trackId:'tr_v',kind:'video',muted:false,clips:[
+      {clipId:'cl_a',startFrame:0,durationFrames:120,assetId:'as_1'},
+      {clipId:'cl_m',startFrame:60,durationFrames:120,assetId:'as_2',muted:true},
+      {clipId:'cl_s',startFrame:90,durationFrames:120,assetId:'as_3'}]},
+      {trackId:'tr_m',kind:'video',muted:true,clips:[{clipId:'cl_t',startFrame:0,durationFrames:120,assetId:'as_1'}]}],
+    assets:[{assetId:'as_1',kind:'video',hasAudio:true},{assetId:'as_2',kind:'video',hasAudio:true},{assetId:'as_3',kind:'image',hasAudio:false}]};
+  if(method==='timeline.visuals.request'){visualWindows.push([params.clipId,params.startFrame,params.endFrame]);return {taskId:'t1',status:'queued',revision:'a'.repeat(64)};}
+  if(method==='timeline.visuals.status')return {taskId:params.taskId,status:'complete',revision:'a'.repeat(64),result:{waveform:{peaks:Array.from({length:256},(_,i)=>i<128?0.2:0.9),materialPeak:1,startFrame:0,endFrame:120}}};
+  throw new Error('unexpected engine method '+method);
+};
+const profile=await profileBridge.audioProfile({projectId:'demo',fromFrame:0,toFrame:120});
+assert.deepEqual(visualWindows,[['cl_a',0,120]],'only unmuted audible clips overlapping the range are sampled');
+assert.equal(profile.bucketSeconds,1);
+assert.deepEqual(profile.curve,[0.2,0.2,0.9,0.9],'window peaks fold onto whole seconds by max');
+assert.deepEqual(profile.sampledClips,['cl_a']);
+assert.equal(profile.unsampledClips,0);
 assert(!text.includes('User additional instructions'),'no custom block without page settings');
 // A bound session with a custom prompt gets the block verbatim (max 2000).
 const longCustom='配乐保持器乐。'.repeat(300)+'OVERFLOW-SENTINEL'; // 1951 + sentinel > 2000

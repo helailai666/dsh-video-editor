@@ -15,6 +15,7 @@
     "index.js",
     "host/*.js",
     "skills/audio-creation/*.md",
+    "skills/music-scoring-library/*.md",
     "client.js",
     "cordis.patch.yml",
     "icon.svg",

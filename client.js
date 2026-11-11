@@ -176,9 +176,10 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeCopy': "复制引用",
       'video.timeline.rangeCopied': "已复制选区引用，可直接粘贴到对话。",
       'video.timeline.rangeNote': "剧情节奏描述",
+      'video.timeline.rangeRequest': "请使用设置页配置的音乐模型为该时间范围生成并添加背景音乐。",
       'video.timeline.rangeSend': "发送到聊天",
       'video.timeline.rangeSending': "发送中…",
-      'video.timeline.rangeSent': "已发送到对话：AI 会撰写器乐提示词，并按选区生成和添加配乐。",
+      'video.timeline.rangeSent': "已发送到对话：AI 会撰写器乐提示词，调用设置页配置的音乐模型按选区生成并添加配乐。",
       'video.timeline.rangeSendFailed': "发送失败或状态未知：请先在对话中确认，再重试（同一请求不会重复插入）。",
       'video.timeline.rangeNoteRequired': "请先描述这段剧情的节奏与情绪。",
       'video.timeline.rangeClear': "清除选区",
@@ -507,9 +508,10 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeCopy': "Copy reference",
       'video.timeline.rangeCopied': "Range reference copied; paste it into the conversation.",
       'video.timeline.rangeNote': "Scene rhythm note",
+      'video.timeline.rangeRequest': "Generate and add background music for this range using the music model configured on the settings page.",
       'video.timeline.rangeSend': "Send to chat",
       'video.timeline.rangeSending': "Sending…",
-      'video.timeline.rangeSent': "Sent to the conversation: the AI writes the instrumental prompt and scores the selection.",
+      'video.timeline.rangeSent': "Sent to the conversation: the AI writes the instrumental prompt and scores the selection with the configured music model.",
       'video.timeline.rangeSendFailed': "Send failed or unconfirmed: check the conversation first, then retry (the same request is never inserted twice).",
       'video.timeline.rangeNoteRequired': "Describe the rhythm and mood of this beat first.",
       'video.timeline.rangeClear': "Clear range",
@@ -4874,7 +4876,7 @@ window.__ModuleLoader__.load({
         const note=String(rangeNote||'').replace(/[\r\n]+/g,' ').trim();
         if(!note)return null;
         const digest=rangeDigest();
-        return referenceText(range.token)+'\n'+note+(digest?'\n'+digest:'');
+        return referenceText(range.token)+'\n'+note+'\n'+t('video.timeline.rangeRequest')+(digest?'\n'+digest:'');
       }
       /**
        * Admit the message through the Host's public session prompt path. A lost
