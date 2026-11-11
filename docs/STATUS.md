@@ -2,9 +2,9 @@
 
 更新：2026-11-11。
 
-## 分支中：设置页配色回显修复 + StepFun/Suno/MiniMax 厂商协议
+## 1.0.2：厂商音乐模型、暗色回显与选区发送到聊天
 
-`codex/vendor-music-models`（基于 main d6623e7）：
+`codex/vendor-music-models` 已通过 PR #3 合入 main（eecea43），版本 bump 至 **1.0.2**：
 
 - 配色：设置浮层与框选条原先引用浅色主题 token（`--dsw-bg-container,#fff` 等），在暗色宿主下输入框与下拉弹出成白底。现全部改用面板自身变量 `--dv-panel-line`/`--dv-panel-ink` 的 color-mix 与 `--dsw-alias-bg-base,#1a1a1c` 兜底，`select option` 单独着色，危险按钮改暗色红 `#e57373`。
 - 协议：`host/plugin-settings.js` 扩为六种（qianwen-sync/qianwen-async/stepfun/suno-inspiration/suno-custom/minimax），厂商协议带文档默认远端模型（`stepaudio-3-music-preview`/`suno-v6`/`music-3.0`），留空自动回填；设置页下拉切换协议时自动带出官方 Base URL 与模型 ID，并显示该厂商的时长/计费提示（zh/en 各 3 个新 key）。
@@ -12,7 +12,8 @@
 - 计费与围栏：内联音频响应上限 96 MiB、解码后素材 64 MiB；按协议设置轮询下限（StepFun 5s、Suno 2s）与请求超时（厂商 600s、MiniMax 420s）；「测试连接」对无模型列表接口厂商使用不计费 probe（假任务号/受理号 GET/空体 POST，400/404 视为可达，401/403 拒绝）。
 - 选区「添加到聊天」原本只复制引用并让用户去输入 `@`，用户实机反馈"点了没用"。查证宿主后确认 **DSH 没有公开的 Composer 草稿写入 API**（插件可见面只有 `inputTriggers.registerSource/sessionOf`，真正插入走内部 `slash/input-insert-*` 事件，属禁止触碰的宿主会话协议/DOM）。按用户选择改为：选区条内新增剧情描述输入 + **发送到聊天**，走 Host 新增的 UI-only `session.send` → 公开 `sessionController.prompt`（mode:queue），消息=精确选区引用 token + 描述，真实进入本作品绑定的会话；`(projectId,requestId)` 去重让丢失的确认可安全重放、不重复插入，失败如实报"状态未知"；空描述禁用按钮；`复制引用` 与 `@` 候选保留为手动路径。Tool 侧仍无任何 `session.*`。
 - 本机（Windows）验证：audio provider 合约（含四协议 StepFun/Suno 灵感/Suno 专业/Suno 恢复/MiniMax/probe/围栏）、plugin-settings 合约、model-contract 27 项（含 session.send 受理/去重/映射权威）、reference-client 30 项、worker timeline 18 项、smoke-client 86 项、check.mjs **58/0**（上一节记录的 54/4 是本机文件被转成 CRLF 导致 check.mjs 的 CSS 模板字面量与多行断言失配，行尾恢复 LF 后与 main 基线一致，非代码缺陷）；check-host 11 项失败均为本机 Windows symlink/权限与 realpath 语义所致（与本次改动无关，需 POSIX 补证）。
-- 未验证与限制：四家真实供应商端到端未跑（无真实 Key/额度）；StepFun/Suno/MiniMax 均不能按帧精确指定时长，依赖既有严格选区裁剪；MiniMax 文档明示自 2026-08-20 起付费音乐接口不再向新账户开放（已在设置页提示）；本轮功能在 `v1.0.1` tag 之后，属 1.0.2 内容。
+- 未验证与限制：四家真实供应商端到端未跑（无真实 Key/额度）；StepFun/Suno/MiniMax 均不能按帧精确指定时长，依赖既有严格选区裁剪；MiniMax 文档明示自 2026-08-20 起付费音乐接口不再向新账户开放（已在设置页提示）。
+- 发布：`v1.0.2` tag 在本 bump 合入 main 后创建；GitHub 源码安装与"插件更新"检查以该 tag 为准。npm 通道仍停在 1.0.0（1.0.1/1.0.2 未发布，需 npm 登录与 POSIX 安装验证门禁）；GitHub Release 页面仍未确认创建，未创建时应用内"检查更新"读不到资产。
 
 ## 1.0.1：GitHub 源码安装通道
 

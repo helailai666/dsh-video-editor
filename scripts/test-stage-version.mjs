@@ -26,7 +26,7 @@ import { admitBundleVersion, parseBundleVersion } from './lib/stage-version.mjs'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STAGE_DEV = join(ROOT, 'scripts', 'stage-dev.mjs');
 const ENGINE_COMMIT = '54f467147ae2f61e118099c4947f55e8da877500';
-const REVIEWED_BUNDLE_VERSION = '1.0.0';
+const REVIEWED_BUNDLE_VERSION = '1.0.2';
 const NODE = process.execPath;
 
 const passes = [];
