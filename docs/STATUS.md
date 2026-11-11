@@ -2,6 +2,14 @@
 
 更新：2026-11-11。
 
+## 分支中：DNS 围栏放行代理 fake-IP + 选区配乐携带片段摘要
+
+基于 main 450803d 建 `codex/audio-fence-proxy-ip`（待 PR）：
+
+- 围栏修复：用户本机代理拦截 DNS，把四家厂商域名都解析到保留测试段的 fake-IP（`198.18.0.x`/`2001:2::xx`），而 `assertPublicHttps` 对解析结果"任一私网即拒"，测试连接误报"服务地址指向不允许的网络范围"。新增 `isProxyFakeIp`/`isBlockedResolvedIp`：仅对**解析结果**放行 198.18.0.0/15、2001:0002::/48 与 RFC 2917 的 2001:0200::/48；字面量 IP、回环、RFC1918、CGNAT、链路本地、ULA、组播与逐级重定向复验全部保持不变。
+- 选区配乐上下文：发送到聊天时在消息尾部附带 `Range content:` 范围内片段摘要（轨道类型、片段名、相对选区起点秒数，上限 14 条）；`sessions.js` 的 Range scoring 固定指令改为要求 AI 撰写器乐提示词时融合该摘要（含画面/旁白语言）、对话中的剧本与语气、设置页音乐提示词配置块（本就追加进上下文），仍使用页面配置的默认音乐模型。
+- 本机（Windows）验证：audio provider 合约（新增 fake-IP 解析通过、ULA 仍拦、字面量 198.18 仍拒等断言）、plugin-settings 合约、model-contract 27 项、smoke-client 86 项、check.mjs **58/0** 全绿；audio-host 与 timeline-workspace 框选 E2E 仍受 win32 引擎 worker 边界限制，需 POSIX 补证。
+
 ## 1.0.2：厂商音乐模型、暗色回显与选区发送到聊天
 
 `codex/vendor-music-models` 已通过 PR #3 合入 main（eecea43），版本 bump 至 **1.0.2**：

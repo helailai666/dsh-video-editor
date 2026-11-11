@@ -4847,12 +4847,34 @@ window.__ModuleLoader__.load({
         const ok=await copyTextLocally(referenceText(range.token));
         setNotice(t(ok?'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
       }
-      /** One chat message: the exact range reference plus the user's scene note. */
+      /**
+       * Compact facts about what actually plays inside the selection — clip
+       * labels, track kinds and offsets from the range start — so the chat AI
+       * scores the footage and its language instead of guessing.
+       */
+      function rangeDigest() {
+        if (!range || !data) return '';
+        const items = [];
+        for (const tr of data.tracks || []) {
+          for (const c of tr.clips || []) {
+            if (c.startFrame < range.toFrame && c.startFrame + c.durationFrames > range.fromFrame) {
+              const label = String(c.label || c.clipId || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 48);
+              const from = ((Math.max(c.startFrame, range.fromFrame) - range.fromFrame) / 30).toFixed(1);
+              const to = ((Math.min(c.startFrame + c.durationFrames, range.toFrame) - range.fromFrame) / 30).toFixed(1);
+              items.push((tr.kind || 'track') + ' "' + label + '" ' + from + '~' + to + 's');
+            }
+          }
+        }
+        if (!items.length) return '';
+        return 'Range content: ' + items.slice(0, 14).join('; ') + '.';
+      }
+      /** One chat message: the exact range reference, the user's note and the range digest. */
       function rangeMessage() {
         if(!range)return null;
         const note=String(rangeNote||'').replace(/[\r\n]+/g,' ').trim();
         if(!note)return null;
-        return referenceText(range.token)+'\n'+note;
+        const digest=rangeDigest();
+        return referenceText(range.token)+'\n'+note+(digest?'\n'+digest:'');
       }
       /**
        * Admit the message through the Host's public session prompt path. A lost

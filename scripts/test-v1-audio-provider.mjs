@@ -11,7 +11,12 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AudioService, QianwenProvider } from '../host/audio.js';
+import {
+  AudioService,
+  QianwenProvider,
+  isPrivateIp,
+  isProxyFakeIp,
+} from '../host/audio.js';
 import { PluginSettingsStore } from '../host/plugin-settings.js';
 const root = await mkdtemp(join(tmpdir(), 'm4-provider-'));
 let calls = 0;
@@ -707,6 +712,57 @@ try {
   assert.equal(f2j.state, 'failed');
   assert.equal(f2j.error.code, 'E_AUDIO_ENDPOINT');
   assert.equal(redirected, 1, 'redirect target is checked before the next request');
+  // Local proxies that intercept DNS answer with fake-IPs from reserved
+  // testing ranges; those resolved addresses must reach the vendor, while a
+  // Base URL literally spelling one out (or real private space) stays blocked.
+  assert.equal(isPrivateIp('198.18.0.206'), true, 'literal fake-IP stays rejected');
+  assert.equal(isProxyFakeIp('198.19.255.1'), true);
+  assert.equal(isProxyFakeIp('2001:2::ce'), true);
+  assert.equal(isProxyFakeIp('2001:0200::5'), true);
+  assert.equal(isProxyFakeIp('2001:200:abcd::1'), false, 'only the /48 blocks pass');
+  assert.equal(isProxyFakeIp('fd00::1'), false);
+  assert.equal(isProxyFakeIp('10.0.0.5'), false);
+  const fakeStore = new PluginSettingsStore({ path: join(fenceRoot, 'fake-settings.json') });
+  await fakeStore.prepare();
+  const fakeSnap = await fakeStore.saveModel({ name: '代理', protocol: 'qianwen-sync', baseUrl: 'https://proxy.example.com', remoteModel: 'm' });
+  const fakeModelId = fakeSnap.musicModels[0].id;
+  const fakeSvc = new AudioService({
+    root: join(fenceRoot, 'audio-fake'),
+    settingsStore: fakeStore,
+    importAudio: async () => ({ asset: { assetId: 'as_12345678', kind: 'audio' } }),
+    lookup: async (hostname) => (hostname === 'proxy.example.com'
+      ? [{ address: '198.18.0.206', family: 4 }, { address: '2001:2::ce', family: 6 }]
+      : [{ address: '93.184.216.34', family: 4 }]),
+    fetch: async (url, init = {}) => {
+      if (init.method === 'POST')
+        return new Response(JSON.stringify({ output: { audio: { url: 'https://proxy.example.com/a.wav' } } }));
+      return new Response(Buffer.from('bytes'));
+    },
+  });
+  await fakeSvc.writeKey(fakeModelId, 'sk-fake');
+  let fkj = await fakeSvc.generate({ projectId: 'demo', operationId: 'fakeip', kind: 'music', text: 'x', modelId: fakeModelId });
+  while (['queued', 'running', 'downloading'].includes((fkj = await fakeSvc.status('demo', fkj.jobId)).state))
+    await new Promise((r) => setTimeout(r, 20));
+  assert.equal(fkj.state, 'succeeded', 'proxy fake-IP DNS answers must not block vendor endpoints');
+  await fakeSvc.dispose();
+  // ULA IPv6 answers are real private space and stay blocked after the easing.
+  const ulaStore = new PluginSettingsStore({ path: join(fenceRoot, 'ula-settings.json') });
+  await ulaStore.prepare();
+  const ulaSnap = await ulaStore.saveModel({ name: '内网v6', protocol: 'qianwen-sync', baseUrl: 'https://ula.example.com', remoteModel: 'm' });
+  const ula = new AudioService({
+    root: join(fenceRoot, 'audio-ula'),
+    settingsStore: ulaStore,
+    importAudio: async () => ({ asset: {} }),
+    lookup: async () => [{ address: 'fd12:3456:7890::1', family: 6 }],
+    fetch: async () => new Response('{}'),
+  });
+  await ula.writeKey(ulaSnap.musicModels[0].id, 'sk-ula');
+  let ulaj = await ula.generate({ projectId: 'demo', operationId: 'ula1', kind: 'music', text: 'x', modelId: ulaSnap.musicModels[0].id });
+  while (['queued', 'running', 'downloading'].includes((ulaj = await ula.status('demo', ulaj.jobId)).state))
+    await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ulaj.state, 'failed');
+  assert.equal(ulaj.error.code, 'E_AUDIO_ENDPOINT', 'ULA DNS answers must stay blocked');
+  await ula.dispose();
   // Unknown async states are protocol errors; the submit is never repeated.
   const badStore = new PluginSettingsStore({ path: join(fenceRoot, 'bad-settings.json') });
   await badStore.prepare();
