@@ -22,6 +22,7 @@
 - npm 包名、Loader 行与客户端模块 id 为 `dsh-video-editor`；稳定 UI key、API 路由和用户数据目录保留 `dsh-video`，避免破坏旧工程。旧本机 link 包在正式迁移前保留，不同时启用旧包与新包。
 - 音乐模型与追加系统提示词的唯一用户入口是插件设置页；`<dataRoot>/plugin-settings.json` 与 `<dataRoot>/audio/audio-secrets.json`（含 models 段）只是页面保存后的 Host 内部持久化，不是配置方式。Key/Base URL/提示词不经聊天 Tool 读写；六种协议（qianwen-sync/qianwen-async、stepfun、suno-inspiration、suno-custom、minimax）仅公网 HTTPS，每次请求前校验 URL 与 DNS，下载不带凭据；损坏的设置文件保留并报错，不静默重置。
 - 计费安全：StepFun task_id、Suno 受理号（`req:` 前缀）或 song_ids 一律先持久化再轮询，重启只恢复查询；Suno 提交使用 `accept_mode=async` 加 `Idempotency-Key`（复用 operationId），其它协议提交失败/超时不自动重试。设置页「测试连接」对无模型列表接口的厂商使用不计费 probe（假任务号/受理号查询/空体请求，400 与 404 视为可达）。StepFun 与 MiniMax 的内联音频响应上限 96 MiB，解码后素材仍限 64 MiB。
+- 进入对话的消息只能走 `session.send`（UI-only，Host 用可信映射解析 Session，再调用公开的 `sessionController.prompt`，mode:queue）；`(projectId, requestId)` 去重使丢失的确认可安全重放，绝不写宿主输入框 DOM 或派发 `slash/input-*` 内部事件（DSH 未提供公开的 Composer 草稿写入 API）。Tool 侧不暴露任何 `session.*`。
 
 ## 打包与验证
 

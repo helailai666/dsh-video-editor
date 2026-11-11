@@ -447,9 +447,12 @@ try {
   await page.waitForFunction(()=>document.querySelector('.dv-range-bar .dv-range-label').textContent.includes('2.00–6.00'));checks++;
   const committedRange=await page.$eval('.dv-timeline-range',e=>({left:parseFloat(e.style.left),width:parseFloat(e.style.width)}));
   assert(committedRange.width>0);checks++;
-  // Add-to-chat routes through the clipboard fallback and reports honestly.
-  await page.evaluate(()=>{const region=document.createElement('div');region.id='paste-region';region.contentEditable='true';document.body.appendChild(region);region.focus();});
-  await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='添加到聊天').click());
+  // Sending the range to the conversation needs a scene note first.
+  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='发送到聊天').disabled),true,'an empty scene note must not enable sending');checks++;
+  await page.evaluate(()=>{const set=(el,v)=>{const proto=Object.getPrototypeOf(el);const desc=Object.getOwnPropertyDescriptor(proto,'value');desc.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};set(document.querySelector('.dv-range-bar .dv-range-note'),'对立、对抗节奏');});
+  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='发送到聊天').disabled),false,'a scene note enables the send action');checks++;
+  // The click reports honestly through the Host session path (no silent success).
+  await page.evaluate(()=>[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='发送到聊天').click());
   await page.waitForFunction(()=>document.querySelector('.dv-range-bar')&&[...document.querySelectorAll('.dv-timeline [role="status"]')].some(p=>p.textContent.length>0));checks++;
   // An invalid range keeps the committed selection and warns instead of writing.
   await page.evaluate(()=>{const set=(el,v)=>{const proto=Object.getPrototypeOf(el);const desc=Object.getOwnPropertyDescriptor(proto,'value');desc.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};set(document.querySelector('.dv-range-bar input[aria-label="选区终点（秒）"]'),'0');[...document.querySelectorAll('.dv-range-bar .dv-button')].find(b=>b.textContent==='区间').click();});

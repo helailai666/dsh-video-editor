@@ -170,13 +170,17 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeTitle': "配乐选区",
       'video.timeline.rangeLabel': "时间范围 {from}–{to}",
       'video.timeline.rangeDescription': "引用这个时间范围生成配乐",
-      'video.timeline.rangeReady': "选区已注册：在右侧对话输入 @ 选择「当前时间范围」，再描述剧情节奏。",
+      'video.timeline.rangeReady': "选区已就绪：在下方描述这段剧情的节奏，然后点「发送到聊天」。",
       'video.timeline.rangeFrom': "选区起点（秒）",
       'video.timeline.rangeTo': "选区终点（秒）",
       'video.timeline.rangeCopy': "复制引用",
-      'video.timeline.rangeCopied': "已复制选区引用。",
-      'video.timeline.rangeAdd': "添加到聊天",
-      'video.timeline.rangeAdded': "已复制选区引用：在右侧对话输入 @ 选择「当前时间范围」，或直接粘贴。",
+      'video.timeline.rangeCopied': "已复制选区引用，可直接粘贴到对话。",
+      'video.timeline.rangeNote': "剧情节奏描述",
+      'video.timeline.rangeSend': "发送到聊天",
+      'video.timeline.rangeSending': "发送中…",
+      'video.timeline.rangeSent': "已发送到对话：AI 会撰写器乐提示词，并按选区生成和添加配乐。",
+      'video.timeline.rangeSendFailed': "发送失败或状态未知：请先在对话中确认，再重试（同一请求不会重复插入）。",
+      'video.timeline.rangeNoteRequired': "请先描述这段剧情的节奏与情绪。",
       'video.timeline.rangeClear': "清除选区",
       'video.timeline.rangeInvalid': "请输入作品时长内的有效范围",
       'video.timeline.rangeCopyFailed': "复制失败，请手动选择引用文本",
@@ -497,13 +501,17 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeTitle': "Scoring range",
       'video.timeline.rangeLabel': "Range {from}–{to}",
       'video.timeline.rangeDescription': "Use this range for background scoring",
-      'video.timeline.rangeReady': "Range registered: type @ in the chat on the right and pick 当前时间范围, then describe the scene.",
+      'video.timeline.rangeReady': "Range ready: describe this beat below, then press Send to chat.",
       'video.timeline.rangeFrom': "Range start (seconds)",
       'video.timeline.rangeTo': "Range end (seconds)",
       'video.timeline.rangeCopy': "Copy reference",
-      'video.timeline.rangeCopied': "Range reference copied.",
-      'video.timeline.rangeAdd': "Add to chat",
-      'video.timeline.rangeAdded': "Range reference copied: type @ in the chat on the right and pick 当前时间范围, or paste it directly.",
+      'video.timeline.rangeCopied': "Range reference copied; paste it into the conversation.",
+      'video.timeline.rangeNote': "Scene rhythm note",
+      'video.timeline.rangeSend': "Send to chat",
+      'video.timeline.rangeSending': "Sending…",
+      'video.timeline.rangeSent': "Sent to the conversation: the AI writes the instrumental prompt and scores the selection.",
+      'video.timeline.rangeSendFailed': "Send failed or unconfirmed: check the conversation first, then retry (the same request is never inserted twice).",
+      'video.timeline.rangeNoteRequired': "Describe the rhythm and mood of this beat first.",
       'video.timeline.rangeClear': "Clear range",
       'video.timeline.rangeInvalid': "Enter a valid range inside the project duration",
       'video.timeline.rangeCopyFailed': "Copy failed; select the reference text manually",
@@ -1856,6 +1864,8 @@ window.__ModuleLoader__.load({
 .dv-root .dv-range-bar strong{font-size:12px}
 .dv-root .dv-range-label{opacity:.8;font-size:11.5px}
 .dv-root .dv-range-bar input[type="number"]{box-sizing:border-box;width:74px;font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit}
+.dv-root .dv-range-bar .dv-range-note{flex:1 1 160px;min-width:140px;font-size:12px;padding:3px 7px;border-radius:7px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit}
+.dv-root .dv-range-bar .dv-range-note::placeholder{color:color-mix(in srgb,var(--dv-panel-ink) 55%,transparent)}
 .dv-root .dv-range-bar .dv-button{font-size:11px;padding:3px 8px}
 .dv-root .dv-timeline-range{position:absolute;top:26px;bottom:0;z-index:6;pointer-events:none;background:color-mix(in srgb,var(--dsw-alias-brand-primary,#82c8cf) 18%,transparent);border-left:2px solid var(--dsw-alias-brand-primary,#5fb7b0);border-right:2px solid var(--dsw-alias-brand-primary,#5fb7b0)}
 .dv-root .dv-timeline-range[data-draft="true"]{opacity:.75}
@@ -4545,7 +4555,11 @@ window.__ModuleLoader__.load({
         [range,setRange]=React.useState(null),
         [rangeDraft,setRangeDraft]=React.useState(null),
         [rangeFrom,setRangeFrom]=React.useState(''),
-        [rangeTo,setRangeTo]=React.useState('');
+        [rangeTo,setRangeTo]=React.useState(''),
+        [rangeNote,setRangeNote]=React.useState(''),
+        [sending,setSending]=React.useState(false);
+      /** Last send attempt so a lost acknowledgement replays the same request id. */
+      const rangeSendRef=React.useRef(null);
       const [recovery,setRecovery]=React.useState(null);
       const [selectedTrack,setSelectedTrack]=React.useState(null),[removeTrack,setRemoveTrack]=React.useState(null),[trackContext,setTrackContext]=React.useState(null),[clipContext,setClipContext]=React.useState(null);
       const gutter=156;
@@ -4827,11 +4841,43 @@ window.__ModuleLoader__.load({
         if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<=a||b>duration){setNotice(t('video.timeline.rangeInvalid'));return;}
         commitRange({fromFrame:a,toFrame:b});
       }
-      function clearRange() {setRange(null);setRangeFrom('');setRangeTo('');setActiveRangeCandidate(null);}
-      async function copyRangeReference(mode) {
+      function clearRange() {setRange(null);setRangeFrom('');setRangeTo('');setRangeNote('');setActiveRangeCandidate(null);rangeSendRef.current=null;}
+      async function copyRangeReference() {
         if(!range)return;
         const ok=await copyTextLocally(referenceText(range.token));
-        setNotice(t(ok?mode==='add'?'video.timeline.rangeAdded':'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
+        setNotice(t(ok?'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
+      }
+      /** One chat message: the exact range reference plus the user's scene note. */
+      function rangeMessage() {
+        if(!range)return null;
+        const note=String(rangeNote||'').replace(/[\r\n]+/g,' ').trim();
+        if(!note)return null;
+        return referenceText(range.token)+'\n'+note;
+      }
+      /**
+       * Admit the message through the Host's public session prompt path. A lost
+       * acknowledgement replays the same request id instead of sending twice, so a
+       * retry can never put the same scoring request in the conversation twice.
+       */
+      async function sendRangeToChat() {
+        const message=rangeMessage();
+        if(!message){setNotice(t('video.timeline.rangeNoteRequired'));return;}
+        if(sending)return;
+        const key=props.projectId+'\n'+message;
+        const previous=rangeSendRef.current;
+        const requestId=previous&&previous.key===key
+          ? previous.requestId
+          : 'dsh-range-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+        rangeSendRef.current={key,requestId};
+        setSending(true);
+        try {
+          const r=await hostRequest('session.send',{projectId:props.projectId,requestId,text:message});
+          setNotice(t(r&&r.accepted===true?'video.timeline.rangeSent':'video.timeline.rangeSendFailed'));
+        } catch (_error) {
+          setNotice(t('video.timeline.rangeSendFailed'));
+        } finally {
+          if(alive.current)setSending(false);
+        }
       }
       function seekAtLane(clientX,lane){
         if(!lane)return;
@@ -5044,8 +5090,9 @@ window.__ModuleLoader__.load({
           h('input',{type:'number',min:0,max:duration/30,step:0.1,value:rangeTo,'aria-label':t('video.timeline.rangeTo'),onChange:e=>setRangeTo(e.target.value),onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();applyRangeInputs();}}}),
           h('span',null,'s'),
           h('button',{className:'dv-button dv-button-quiet',onClick:applyRangeInputs},t('video.reference.range')),
-          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('add')},t('video.timeline.rangeAdd')),
-          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('copy')},t('video.timeline.rangeCopy')),
+          h('input',{className:'dv-range-note',type:'text',maxLength:600,value:rangeNote,placeholder:t('video.timeline.rangeNote'),'aria-label':t('video.timeline.rangeNote'),onChange:e=>{setRangeNote(e.target.value);rangeSendRef.current=null;},onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();void sendRangeToChat();}}}),
+          h('button',{className:'dv-button',disabled:sending||!rangeNote.trim(),onClick:()=>void sendRangeToChat()},t(sending?'video.timeline.rangeSending':'video.timeline.rangeSend')),
+          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference()},t('video.timeline.rangeCopy')),
           h('button',{className:'dv-button dv-button-quiet',onClick:clearRange},t('video.timeline.rangeClear')),
         ):null,
         removeTrack?h(TrackDeleteConfirmation,{t,busy,name:data.tracks.find(tr=>tr.trackId===removeTrack.trackId)?.name||'',onCancel:()=>setRemoveTrack(null),onConfirm:()=>{const target=removeTrack;setRemoveTrack(null);if(target.revision!==data.revision){setNotice(t('video.canvas.revisionRefreshed'));return;}void write([{op:'track.remove',trackId:target.trackId,force:true}]);}}):null,

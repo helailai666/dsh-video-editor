@@ -13,6 +13,7 @@
 
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { BridgeError, logSummary } from './errors.js';
 import { MAX_SESSIONS_PER_PROJECT, SESSION_ID_PATTERN, SESSION_STATE_VERSION, SessionStateStore } from './session-state.js';
@@ -44,6 +45,14 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const MAX_CREATE_DEDUPE = 32;
 const MAX_LIST_ITEMS = 100;
+/**
+ * UI-composed chat messages ("send this scoring range to the conversation").
+ * The request id is remembered so a lost acknowledgement can be replayed by the
+ * same id instead of admitting the same message twice.
+ */
+const MAX_SEND_DEDUPE = 32;
+const MAX_SEND_CHARS = 4000;
+const SEND_TIMEOUT_MS = 30000;
 /**
  * Bounded legacy-reference scan: an old shared-root file is only previewable when
  * this exact Session's own inspected events name that exact absolute path. The
@@ -206,6 +215,7 @@ export class SessionService {
     this.contextDispose = null;
     this.creating = new Map();
     this.created = new Map();
+    this.sent = new Map();
     this.cwdPromise = null;
     this.projectSessionRoots = new Map();
     this.closing = false;
@@ -655,6 +665,100 @@ export class SessionService {
     };
   }
 
+  /**
+   * Admit one UI-composed message into this project's bound Session through the
+   * public DSH `sessionController.prompt` API (queue mode: the Session's own
+   * inbox orders it, nothing here bypasses the Agent).
+   *
+   * The plugin never accepts a Session id from the UI — the target is always the
+   * persisted mapping for this project. A `(projectId, requestId)` pair that was
+   * already accepted replays its acknowledgement instead of sending twice, so the
+   * Client can retry a lost response with the same id.
+   */
+  async send(projectId, requestId, text) {
+    this.requireEnabled();
+    this.requireActive();
+    if (typeof requestId !== 'string' || REQUEST_ID_PATTERN.test(requestId) === false) {
+      throw sessionError('E_PARAMS', 'Invalid session send request id');
+    }
+    if (
+      typeof text !== 'string' ||
+      text.trim().length === 0 ||
+      text.length > MAX_SEND_CHARS ||
+      /[\0\r]/.test(text)
+    ) {
+      throw sessionError('E_PARAMS', 'Invalid session send content');
+    }
+    const project = await this.store.project(projectId);
+    const sessionId =
+      typeof project.activeSessionId === 'string'
+        ? project.activeSessionId
+        : project.sessionIds.length > 0
+          ? project.sessionIds[project.sessionIds.length - 1]
+          : null;
+    if (sessionId === null) {
+      throw sessionError('E_SESSION_NOT_BOUND', 'This project has no creation Session yet');
+    }
+    const hash = createHash('sha256')
+      .update(requestId + '\n' + text)
+      .digest('hex');
+    const key = this.dedupeKey(projectId, requestId);
+    const previous = this.sent.get(key);
+    if (previous !== undefined) {
+      if (previous.hash !== hash) {
+        throw sessionError('E_OPERATION_REUSED', 'This send request id belongs to different content');
+      }
+      return previous.value;
+    }
+    const controller = this.service('sessionController');
+    if (controller === null || typeof controller !== 'object' || typeof controller.prompt !== 'function') {
+      throw sessionError('E_SESSION_CONFIG', 'The DSH Session Controller cannot accept prompts');
+    }
+    const abort = new AbortController();
+    const timer = setTimeout(() => {
+      try {
+        abort.abort();
+      } catch (_error) {
+        /* the acknowledgement already settled */
+      }
+    }, SEND_TIMEOUT_MS);
+    let value;
+    try {
+      value = await controller.prompt(
+        {
+          requestId,
+          sessionId,
+          mode: 'queue',
+          content: [{ type: 'text', text }],
+        },
+        abort.signal,
+      );
+    } catch (error) {
+      this.report(error, 'session send');
+      // Admission may already have happened before the transport failed, so this
+      // is reported as uncertain: the Client must not silently resend.
+      throw sessionError('E_SESSION_SEND', 'The Session did not confirm this message; check the conversation before sending again');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (value === null || typeof value !== 'object' || value.accepted !== true) {
+      throw sessionError('E_SESSION_SEND', 'The Session returned an invalid prompt acknowledgement');
+    }
+    const result = {
+      enabled: true,
+      contract: SESSION_STATE_VERSION,
+      projectId,
+      sessionId,
+      accepted: true,
+    };
+    this.sent.set(key, { hash, value: result, at: Date.now() });
+    while (this.sent.size > MAX_SEND_DEDUPE) {
+      const oldest = this.sent.keys().next().value;
+      this.sent.delete(oldest);
+    }
+    return result;
+  }
+
   /** Async project lookup used by tool scope checks. */
   async projectForSession(sessionId) {
     const error = this.configurationError();
@@ -668,6 +772,7 @@ export class SessionService {
     if (method === 'session.list') return this.list(params.projectId);
     if (method === 'session.create') return this.create(params.projectId, params.requestId);
     if (method === 'session.select') return this.select(params.projectId, params.sessionId);
+    if (method === 'session.send') return this.send(params.projectId, params.requestId, params.text);
     throw sessionError('E_METHOD', 'Unknown session action');
   }
 
