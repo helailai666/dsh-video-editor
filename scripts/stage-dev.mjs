@@ -53,6 +53,7 @@ const RUNTIME_PATHS = [
   'skills/audio-creation/SKILL.md',
   'skills/audio-creation/THIRD_PARTY.md',
   'skills/music-scoring-library/SKILL.md',
+  'skills/drama-beat-shifts/SKILL.md',
   'host/data-root.js',
   'host/ui-state.js',
   'host/config.js',

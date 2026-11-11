@@ -1997,7 +1997,7 @@ export class VideoBridge {
       else if(method==='audio.model.remove')result=await this.audio.removeModel(normalized.modelId);
       else if(method==='audio.model.default')result=await this.audio.setDefaultModel(normalized.modelId);
       else if(method==='audio.check')result=await this.audio.check(normalized.modelId);
-      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))};
+      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/drama-beat-shifts/SKILL.md',import.meta.url),'utf8'))};
       else if(method==='audio.recipe')result=await this.audio.recipe(normalized.projectId,normalized.jobId);
       else if(method==='audio.generate')result=await this.audio.generate(normalized);
       else if(method==='audio.cancel')result=await this.audio.cancel(normalized.projectId,normalized.jobId);

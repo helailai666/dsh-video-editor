@@ -10,6 +10,7 @@
 - Host：`timeline.audioProfile` 支持 `assetId` 模式（与 fromFrame/toFrame 二选一，validate XOR），`assetAudioCurve` 折叠 >1200 桶并回 curve/rmsCurve/durationSeconds；Tool 描述与参数（assetId 白名单）同步两阶段+窗口选择。
 - 指令与 skill：sessions.js Range scoring 行压缩并加入"整曲→audioProfile(assetId)→按已确认表选窗口→sourceInFrame 对齐并如实报告偏移"；audio-creation 选区步骤扩为 10 步（第 7 步窗口选择）；配乐库新增"Reverse alignment"节（提示词写相对结构而非秒数，生成后按包络定位高潮/静默再对齐）。
 - 本机（Windows）验证：model-contract 全绿（新增 assetId 校验/互斥/行为桩、worker/schema/README parity 源断言；contextChars 6092、含自定义块 7957 仍在预算内）、check 58/0、smoke 86/0、audio provider、plugin-settings、stage-version 10/0。worker 集成测试 schema.test 的 doctor 响应项在纯 main 同样失败（Windows 平台边界，非本次引入）；asset.envelope 端到端与真实"整曲选窗上轨"待 POSIX/实机复测。
+- 追加第三份配套 skill `skills/drama-beat-shifts/SKILL.md`（快节奏AI短剧情绪突变设计器，用户提供规则原文保留）：单集 3~6 次"稳态(≤15s/元素≤2)↔爆发(第一拍即 fff/≥3 项极限手段)"高频硬切、转换点与钩子帧对齐、炸裂转化库表与钩子音效、输出模板与自检清单；新增"落地到本插件真实能力"映射——每个稳态/爆发段=独立 cue 相邻上轨（fade 0~6 帧、空隙表达全体休止）、模板到六列表的取值规则（强度禁 4~7 平铺）、计费提示词只写相对强度词、N 段=N 次计费须在确认表中写明、procedural 兜底反而更可控。`audio.guide` 现拼接三份 skill；package.json/stage-dev/两份测试断言同步。
 
 ## 分支中：选区配乐两阶段流程（云模型强制 + 逐秒分析 + 确认门控）
 

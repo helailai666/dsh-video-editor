@@ -37,6 +37,9 @@ assert(schemaText.includes('"asset.envelope"'),'the protocol schema must documen
 const workerReadme=await readFile('packages/video-engine-worker/README.md','utf8');
 assert(workerReadme.includes('`asset.envelope`'),'the worker README must list asset.envelope');
 assert(bridgeSourceForProfile.includes('music-scoring-library/SKILL.md'),'audio.guide must bundle the companion genre library');
+assert(bridgeSourceForProfile.includes('drama-beat-shifts/SKILL.md'),'audio.guide must bundle the beat-shift designer');
+const beatShiftSkill=await readFile('skills/drama-beat-shifts/SKILL.md','utf8');
+assert(beatShiftSkill.includes('快节奏AI短剧情绪突变设计器')&&beatShiftSkill.includes('每个稳态/爆发段 = 一条独立 cue'),'the designer must map hard cuts onto real plugin edits');
 const librarySkill=await readFile('skills/music-scoring-library/SKILL.md','utf8');
 assert(librarySkill.includes('配乐库')&&librarySkill.includes('复仇、霸总、逆袭、打脸'),'the genre table ships with the plugin');
 const creationSkill=await readFile('skills/audio-creation/SKILL.md','utf8');

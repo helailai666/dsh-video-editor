@@ -4,7 +4,7 @@ description: Genre scoring library (配乐库) that expands how music prompts ar
 ---
 # Genre scoring library (配乐库)
 
-Creative reference for scoring Chinese short-drama (短剧) footage. It never overrides the fixed safety, billing, revision or confirmation rules; it only enriches the mood, instrumentation, tempo and hit-point design you write into the timeline table and the condensed instrumental prompt.
+Creative reference for scoring Chinese short-drama (短剧) footage. It never overrides the fixed safety, billing, revision or confirmation rules; it only enriches the mood, instrumentation, tempo and hit-point design you write into the timeline table and the condensed instrumental prompt. For high-frequency calm→conflict switching (fast reversals, face-slap hooks), also follow the bundled 快节奏情绪突变设计器 (drama-beat-shifts) skill.
 
 ## Match the genre first
 
