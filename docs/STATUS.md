@@ -2,16 +2,20 @@
 
 更新：2026-11-11。
 
-## 分支中：计费提示词强制"卡点结构线"（对准画面事件）
+## 1.0.3：围栏 fake-IP 修复、选区配乐两阶段、整曲窗口对齐与三份配乐 skill
 
-基于 main 1bf1112 建 `codex/prompt-hitpoint-format`（待 PR）。用户实机反馈：四段 cue 提示词风格正确，但卡点描述停留在音乐内部的模糊词（"中段""缓慢推进"），没有和画面事件绑定。
+版本 bump 至 **1.0.3**：用户实机测试通过（测试连接、两阶段选区配乐、整曲选窗上轨、卡点结构线）。合入的 PR：#5 围栏+片段摘要、#7 云模型强制+两阶段+配乐库、#8 整曲窗口对齐+突变设计器、#9 卡点结构线。tag `v1.0.3` 在本 bump 合入 main 后创建；npm 通道仍停在 1.0.0，GitHub Release 仍未创建（状态同 1.0.2 一节）。
+
+### 计费提示词强制"卡点结构线"（对准画面事件）
+
+基于 main 1bf1112 建 `codex/prompt-hitpoint-format`，经 PR #9 合入。用户实机反馈：四段 cue 提示词风格正确，但卡点描述停留在音乐内部的模糊词（"中段""缓慢推进"），没有和画面事件绑定。
 
 - 三份 skill 同步强制**卡点结构线**：`<该 cue 长度的百分比位置> <音乐动作>（对准 <画面事件>）`+收尾方式与下一段转场一致。位置只用百分比/段落词（模型遵循相对位置、忽略绝对秒数），但每个卡点必须写明对准哪句台词重音/哪个动作起手/哪次反转/出入画——来自确认表的卡点·转场列。配乐库 Condense 节改为固定五段式模板并给出中英示例；audio-creation 第 3 步要求表卡点列绑具体画面事件（禁"紧张推进"类泛词）、第 7 步窗口选择后逐卡点评分（命中/漂移几秒/是否值得重挑或重生成）；drama-beat-shifts 计费提示词条目同步。
 - 纯 skill 文案改动，无代码/上下文预算变化；model-contract 新增 2 项断言（三份 skill 均含卡点结构线、禁绝对秒数），本机全绿；真实提示词质量待实机复测。
 
-## 分支中：整曲窗口对齐（asset.envelope + audioProfile assetId 模式）
+### 整曲窗口对齐（asset.envelope + audioProfile assetId 模式）
 
-基于 main 5bbe304 建 `codex/range-window-alignment`（待 PR）。背景：用户实机确认 StepFun 等云模型无视逐秒提示词与时长请求，返回 3 分半整曲；旧契约 `sourceInFrame:0` 会把静默前奏垫进对白，AI 只能违规用 shell astats 手挑窗口。
+基于 main 5bbe304 建 `codex/range-window-alignment`，经 PR #8 合入。背景：用户实机确认 StepFun 等云模型无视逐秒提示词与时长请求，返回 3 分半整曲；旧契约 `sourceInFrame:0` 会把静默前奏垫进对白，AI 只能违规用 shell astats 手挑窗口。
 
 - 引擎（随插件捆绑，协议 0.9.0 原位扩展、不 bump 版本）：worker 新方法 `asset.envelope{projectId,assetId}`（`worker.mjs` case + `TimelineVisuals.envelopeOf`），复用 peaks-v1 缓存包络，返回整条素材约 1 秒桶的 peaks/rms/materialPeak；无音频素材 E_PARAMS；60s 解码截止。protocol.schema.json 增 params/request/result 与 oneOf 引用，worker README 补行；schema↔worker↔README 静态 parity 测试本机通过。
 - Host：`timeline.audioProfile` 支持 `assetId` 模式（与 fromFrame/toFrame 二选一，validate XOR），`assetAudioCurve` 折叠 >1200 桶并回 curve/rmsCurve/durationSeconds；Tool 描述与参数（assetId 白名单）同步两阶段+窗口选择。
@@ -19,9 +23,9 @@
 - 本机（Windows）验证：model-contract 全绿（新增 assetId 校验/互斥/行为桩、worker/schema/README parity 源断言；contextChars 6092、含自定义块 7957 仍在预算内）、check 58/0、smoke 86/0、audio provider、plugin-settings、stage-version 10/0。worker 集成测试 schema.test 的 doctor 响应项在纯 main 同样失败（Windows 平台边界，非本次引入）；asset.envelope 端到端与真实"整曲选窗上轨"待 POSIX/实机复测。
 - 追加第三份配套 skill `skills/drama-beat-shifts/SKILL.md`（快节奏AI短剧情绪突变设计器，用户提供规则原文保留）：单集 3~6 次"稳态(≤15s/元素≤2)↔爆发(第一拍即 fff/≥3 项极限手段)"高频硬切、转换点与钩子帧对齐、炸裂转化库表与钩子音效、输出模板与自检清单；新增"落地到本插件真实能力"映射——每个稳态/爆发段=独立 cue 相邻上轨（fade 0~6 帧、空隙表达全体休止）、模板到六列表的取值规则（强度禁 4~7 平铺）、计费提示词只写相对强度词、N 段=N 次计费须在确认表中写明、procedural 兜底反而更可控。`audio.guide` 现拼接三份 skill；package.json/stage-dev/两份测试断言同步。
 
-## 分支中：选区配乐两阶段流程（云模型强制 + 逐秒分析 + 确认门控）
+### 选区配乐两阶段流程（云模型强制 + 逐秒分析 + 确认门控）
 
-基于 main 238b3f0 建 `codex/range-score-cloud-model`（PR #7，追加提交中）：
+基于 main 238b3f0 建 `codex/range-score-cloud-model`，经 PR #7 合入：
 
 - 背景：用户实机发送选区后，AI 被"先本地免费合成、仅明确要求才调云模型"的旧措辞带偏，用 procedural 合成了配乐，未调用设置页配置的云音乐模型。
 - `sessions.js`：Audio requests 行补注"选区条发送即显式云请求"；Range scoring 行重写为**两阶段**——阶段一不计费：`timeline.resolve` + 新 `timeline.audioProfile` 逐秒响度曲线 + 一次 frame 抽帧（≤4 帧）+ 一次 read_image，融合片段摘要、对话剧本、视频语言与设置页音乐提示词，输出固定列的精确时间轴表（时间段（秒）/情绪状态/强度(1-10)/配器与音色/动态与音量/卡点·转场）与 ≤2000 字符浓缩器乐提示，展示并**结束回合等待用户确认**；阶段二仅在确认后 `audio.generate kind music WITHOUT provider or score` 走页面配置模型，禁止 procedural 替代（未配置模型或云失败才回落且须如实说明）。为守住 8000 上下文预算，压缩了 Audio requests 行措辞（实测 contextChars 6075、含自定义块 7940）。
@@ -30,9 +34,9 @@
 - 配套 skill `skills/music-scoring-library/SKILL.md`（配乐库）：八类短剧题材（复仇霸总/甜宠/悬疑权谋古风/仙侠玄幻/虐恋/喜剧萌宝/都市职场/历史穿越）的核心情绪、乐器音色、BPM 与设计要点表，指导逐秒表各列取值、响度曲线→强度锚定、卡点对齐片段边界、浓缩云提示词的写法与中→英乐器翻译对照；`audio.guide` 现拼接返回 audio-creation+配乐库两份 skill（audio-creation 的选区小节同步改为两阶段+确认门控）；package.json files 与 stage-dev 清单已收录。
 - 本机（Windows）验证：model-contract 扩至 40 项断言（两阶段措辞、audioProfile 参数白名单/校验/行为桩测试：静音轨与无声片段跳过、曲线折叠 [0.2,0.2,0.9,0.9]）、audio provider 合约、plugin-settings、smoke-client 86 项、check.mjs 58/0 全绿；真实对话端到端（逐秒表→确认→云生成）待用户实机复测。
 
-## 分支中：DNS 围栏放行代理 fake-IP + 选区配乐携带片段摘要
+### DNS 围栏放行代理 fake-IP + 选区配乐携带片段摘要
 
-基于 main 450803d 建 `codex/audio-fence-proxy-ip`（待 PR）：
+基于 main 450803d 建 `codex/audio-fence-proxy-ip`，经 PR #5 合入：
 
 - 围栏修复：用户本机代理拦截 DNS，把四家厂商域名都解析到保留测试段的 fake-IP（`198.18.0.x`/`2001:2::xx`），而 `assertPublicHttps` 对解析结果"任一私网即拒"，测试连接误报"服务地址指向不允许的网络范围"。新增 `isProxyFakeIp`/`isBlockedResolvedIp`：仅对**解析结果**放行 198.18.0.0/15、2001:0002::/48 与 RFC 2917 的 2001:0200::/48；字面量 IP、回环、RFC1918、CGNAT、链路本地、ULA、组播与逐级重定向复验全部保持不变。
 - 选区配乐上下文：发送到聊天时在消息尾部附带 `Range content:` 范围内片段摘要（轨道类型、片段名、相对选区起点秒数，上限 14 条）；`sessions.js` 的 Range scoring 固定指令改为要求 AI 撰写器乐提示词时融合该摘要（含画面/旁白语言）、对话中的剧本与语气、设置页音乐提示词配置块（本就追加进上下文），仍使用页面配置的默认音乐模型。
