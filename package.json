@@ -1,6 +1,6 @@
 {
   "name": "dsh-video-editor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": false,
   "description": "Create, preview and edit videos with AI inside DeepSeek Harness.",
   "type": "module",
