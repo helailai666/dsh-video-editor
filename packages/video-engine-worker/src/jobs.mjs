@@ -14,14 +14,49 @@ const terminal = new Set(["succeeded", "failed", "cancelled", "timed_out"]);
 export const MAX_FRAME_TIMES = 4;
 /**
  * Worker-enforced job deadlines. A frame captures one short snapshot (120s is
- * generous); a full MP4 render scales with the composition and needs minutes
- * (a 20s composition measures ~112s), so render gets a 15-minute ceiling and
- * that is also its default. Both bounds are mirrored by the Host validator.
+ * generous); a full MP4 render scales with the composition and is capped by
+ * MAX_RENDER_TIMEOUT_MS (6 hours), mirrored by the Host validator. Two measured
+ * phases need that budget: the HyperFrames capture — a 20s composition measures
+ * ~112s, i.e. ~187ms/frame, and 1080x1920 software capture is slower still — and
+ * the post-capture validation, whose `ffprobe -count_frames` decodes every frame.
  */
 export const FRAME_TIMEOUT_MS = 120000;
 export const MAX_RENDER_TIMEOUT_MS = 21600000;
+const RENDER_BASE_MS = 120000;
+const RENDER_MS_PER_FRAME = 240;
+const RENDER_MIN_MS = 300000;
+const VALIDATE_BASE_MS = 10000;
+const VALIDATE_MS_PER_FRAME = 25;
+const VALIDATE_MIN_MS = 15000;
+const MAX_RENDER_FRAMES = 108000;
 const FRAME_TILE_MAX_WIDTH = 480;
 const CONTACT_SHEET_TIMEOUT_MS = 30000;
+
+/**
+ * Default capture deadline for a render of `frames` frames. A composition is
+ * bounded to 3600s @30fps, so 108000 frames is the largest valid input.
+ */
+export function renderTimeoutMs(frames) {
+  number(frames, 1, MAX_RENDER_FRAMES);
+  return Math.min(
+    MAX_RENDER_TIMEOUT_MS,
+    Math.max(RENDER_MIN_MS, RENDER_BASE_MS + RENDER_MS_PER_FRAME * frames),
+  );
+}
+
+/**
+ * Validation probe budget. `-count_frames` decodes the whole MP4, so the old
+ * fixed 15s window silently killed every long 1080x1920 export after capture
+ * had already reached progress 1. 25ms/frame budgets a worst-case 40fps decode
+ * count and keeps the short-render floor unchanged.
+ */
+export function validateProbeTimeoutMs(frames) {
+  number(frames, 1, MAX_RENDER_FRAMES);
+  return Math.min(
+    MAX_RENDER_TIMEOUT_MS,
+    Math.max(VALIDATE_MIN_MS, VALIDATE_BASE_MS + VALIDATE_MS_PER_FRAME * frames),
+  );
+}
 
 /**
  * Canonical millisecond label shared by the HyperFrames `--keep` still name
@@ -322,13 +357,7 @@ export class Jobs {
         timeoutMs:
           p.timeoutMs ??
           (job.kind === "render"
-            ? Math.min(
-                MAX_RENDER_TIMEOUT_MS,
-                Math.max(
-                  300000,
-                  60000 + 140 * Math.round(doc.compositionDuration * 30),
-                ),
-              )
+            ? renderTimeoutMs(Math.round(doc.compositionDuration * 30))
             : FRAME_TIMEOUT_MS),
         onOutput: (s) => {
           const m = s.match(/Streaming frame (\d+)\/(\d+)/);
@@ -345,6 +374,13 @@ export class Jobs {
         return;
       }
       if (result.status === "timed_out") {
+        // `stage:"finished"` is set unconditionally in the finally block, so a
+        // timed-out job is only explainable through its error record.
+        job.error = {
+          code: "E_TIMEOUT",
+          message: "渲染或校验超出时间预算，未发布任何产物",
+          stage: job.stage,
+        };
         final = "timed_out";
         return;
       }
@@ -507,6 +543,7 @@ export class Jobs {
       let metadata;
       if (job.kind === "render") {
         bytes = await readFile(produced);
+        const frames = Math.round(doc.compositionDuration * fps);
         const probeRun = await runOwned(
           [
             "ffprobe",
@@ -526,7 +563,7 @@ export class Jobs {
             cwd: packageRoot,
             env: this.env(job.temp, job.kind),
             signal: job.controller.signal,
-            timeoutMs: 15000,
+            timeoutMs: validateProbeTimeoutMs(frames),
           },
         );
         job.ownedPids.push(...(probeRun.ownedPids || []));
@@ -535,6 +572,11 @@ export class Jobs {
           return;
         }
         if (probeRun.status === "timed_out") {
+          job.error = {
+            code: "E_TIMEOUT",
+            message: "渲染或校验超出时间预算，未发布任何产物",
+            stage: job.stage,
+          };
           final = "timed_out";
           return;
         }
@@ -542,7 +584,6 @@ export class Jobs {
           fail("E_METADATA", "Metadata probe failed", "validate");
         const probe = JSON.parse(probeRun.output);
         const stream = probe.streams?.[0];
-        const frames = Math.round(doc.compositionDuration * fps);
         if (
           stream?.codec_name !== "h264" ||
           stream.width !== doc.width ||

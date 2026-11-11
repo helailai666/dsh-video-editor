@@ -2,6 +2,17 @@
 
 更新：2026-11-11。
 
+## 开发中：长片导出不再在收尾处静默消失（codex/render-validate-timeout）
+
+用户实机：1080×1920@30fps、159.8s 整片导出两次都在 `stage: finished / progress 1` 后变成 `timed_out`，全盘搜不到新 mp4、导出目录为空、无日志；换 720×1280 抓帧明显更快。
+
+- 根因（静态定位，非猜测）：`validate` 用 `ffprobe -count_frames` 全帧解码校验产物，预算**写死 15000ms**；4794 帧竖屏必然超时，而 `finally` 无条件删私有临时目录，所以文件"渲染完了但没有"。`stage:"finished"` 只是 finally 的收尾标签，`timed_out` 分支过去不设 `job.error`，因此没有任何原因可见。
+- 修复：新增两个纯函数预算 `renderTimeoutMs(frames)=min(6h, max(300s, 120000+240×frames))`（原 `60000+140×frames` 对 1080p 吞吐只有 1.28 倍余量，代码注释自证 20s 合成实测 ~112s≈187ms/帧）与 `validateProbeTimeoutMs(frames)=max(15s, 10000+25×frames)`（按最坏 40 帧/秒解码计数，159.8s → ≈129.9s）；两处 `timed_out` 出口（引擎子进程、计数探测）都写 `error{code:"E_TIMEOUT", stage}`；顶部"15 分钟 ceiling"陈旧注释改为实际公式。
+- 客户端两处导出入口统一预算：抽出 `renderBudgetMs(seconds)` + `EXPORT_POST_CAPTURE_SLACK_MS`（抓帧之后还有两遍 loudnorm 与全帧校验）。顶栏此前轮询窗口（13.2 分钟）**小于**它自己请求的引擎 15 分钟，到期即 `cancel` 并追回已发布文件；画布 `exportVideo()` 更是写死 `240×500ms≈120s` 且不传 `timeoutMs`，长片必失败——现在两者共用同一式并带超时后取消。
+- `host/config.js` 默认 `maxArtifactBytes` 64MiB → **192MiB**（1080×1920 数分钟成片常见 40–120MB，会撞下载上限；`readArtifact` 仍是全量读入 + SHA256，流式下载列为后续项，上限校验规则本身允许到 256MiB）。
+- 本机（Windows）验证：新增 `packages/video-engine-worker/test/jobs-timeout.test.mjs` 4 项（含"计数探测不再写死 15 秒""两处 timed_out 都带 E_TIMEOUT"源文本断言）；worker 纯单测 29 项全绿；model-contract 27 项（新增 4 项预算 parity 断言，固定指令实测仍为 contextChars 6092/customChars 7957）；check.mjs **58/0**、smoke-client **86/0**（导出项断言随之改为 300000）、check-host **60 通过/11 失败**（11 项均为本机 symlink EINVAL 平台边界，与基线一致）。`packages/video-engine-worker/test/worker.test.mjs` 在本机因缺少嵌套 `node_modules/gsap` 而 ENOENT，属环境缺失，非本次引入。
+- 未验证：真实长片导出证据必须由用户 macOS 实机复跑（引擎 worker 明确拒绝 win32，见 1.0.1/1.0.2 一节同一边界）；若成片体积超过 192MiB 会返回 `E_ARTIFACT_LIMIT`，届时再决定流式下载。
+
 ## 1.0.3：围栏 fake-IP 修复、选区配乐两阶段、整曲窗口对齐与三份配乐 skill
 
 版本 bump 至 **1.0.3**：用户实机测试通过（测试连接、两阶段选区配乐、整曲选窗上轨、卡点结构线）。合入的 PR：#5 围栏+片段摘要、#7 云模型强制+两阶段+配乐库、#8 整曲窗口对齐+突变设计器、#9 卡点结构线。tag `v1.0.3` 在本 bump 合入 main 后创建；npm 通道仍停在 1.0.0，GitHub Release 仍未创建（状态同 1.0.2 一节）。

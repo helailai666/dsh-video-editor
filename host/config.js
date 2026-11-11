@@ -48,7 +48,11 @@ const DEFAULT_LIMITS = Object.freeze({
   maxLineBytes: 65536,
   maxStderrBytes: 16384,
   maxRequestBytes: 65536,
-  maxArtifactBytes: 64 * 1024 * 1024,
+  // A 1080x1920 film of several minutes renders well past 64 MiB, and the Host
+  // reads the published artifact fully into memory to verify its SHA-256 before
+  // streaming it to the browser. Streaming download is the follow-up; until then
+  // the ceiling has to cover a real long export.
+  maxArtifactBytes: 192 * 1024 * 1024,
   maxResultBytes: 1024 * 1024,
   maxPreviewBytes: 8 * 1024 * 1024,
   maxAssetBytes: 2 * 1024 * 1024 * 1024,

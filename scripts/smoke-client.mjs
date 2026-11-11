@@ -4976,7 +4976,7 @@ test('P3-017 B3: product export binds the clicked revision and reports stage/pro
   editor.rerender();
   assert(renderCalls.length === 1, `a double click started ${renderCalls.length} renders`);
   assert(renderCalls[0].revision === revisionA, 'the export is not bound to the inspected revision');
-  assert(renderCalls[0].timeoutMs === 900000, `the render timeout is not the 15 minute bound: ${renderCalls[0].timeoutMs}`);
+  assert(renderCalls[0].timeoutMs === 300000, `the render timeout is not the shared client budget: ${renderCalls[0].timeoutMs}`);
   // Drive the fake job while observing the real rendered stage/progress state.
   const observedStages = new Set();
   const observedProgress = new Set();
