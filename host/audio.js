@@ -135,10 +135,62 @@ export function isPrivateIp(value) {
   if (/^ff[0-9a-f]{2}:|^ff/i.test(ip)) return true;
   return false;
 }
+/** Expand an IPv6 text form into eight 16-bit groups, or null if malformed. */
+function expandIpv6(value) {
+  const ip = String(value).toLowerCase().replace(/^\[|\]$/g, '');
+  if (!ip.includes(':') || !/^[0-9a-f:.]+$/.test(ip)) return null;
+  const dbl = ip.indexOf('::');
+  if (dbl >= 0 && ip.indexOf('::', dbl + 1) >= 0) return null;
+  const head = dbl < 0 ? ip : ip.slice(0, dbl);
+  const tail = dbl < 0 ? '' : ip.slice(dbl + 2);
+  const hp = head === '' ? [] : head.split(':');
+  const tp = tail === '' ? [] : tail.split(':');
+  if (dbl < 0 ? hp.length !== 8 : hp.length + tp.length > 7) return null;
+  const filled = [...hp, ...Array(8 - hp.length - tp.length).fill('0'), ...tp];
+  const groups = [];
+  for (const part of filled) {
+    if (!/^[0-9a-f]{1,4}$/.test(part)) return null;
+    groups.push(parseInt(part, 16));
+  }
+  return groups;
+}
+/**
+ * Reserved-for-testing ranges a local proxy hands back as fake-IPs when it
+ * intercepts DNS (Clash/sing-box style 198.18.0.0/15 and 2001:0002::/48
+ * answers, plus RFC 2917's 2001:0200::/48 benchmark block). They are not
+ * routable to internal services, so a *resolved* DNS answer may use them; a
+ * Base URL that literally spells one out stays rejected through isPrivateIp.
+ */
+export function isProxyFakeIp(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  if (isIpv4(value)) {
+    const [a, b] = value.split('.').map(Number);
+    return a === 198 && (b === 18 || b === 19);
+  }
+  const ip = value.toLowerCase().replace(/^\[|\]$/g, '');
+  const mapped = ip.match(/^::ffff:((\d{1,3}\.){3}\d{1,3})$/);
+  if (mapped) return isProxyFakeIp(mapped[1]);
+  const groups = expandIpv6(ip);
+  if (!groups) return false;
+  return (
+    groups[0] === 0x2001 &&
+    (groups[1] === 0x0002 || groups[1] === 0x0200) &&
+    groups[2] === 0
+  );
+}
+/** DNS answers: real local ranges stay blocked, proxy fake-IP ranges pass. */
+function isBlockedResolvedIp(value) {
+  if (typeof value !== 'string' || value.length === 0) return true;
+  return isPrivateIp(value) && !isProxyFakeIp(value);
+}
 async function defaultLookup(hostname) {
   return dns.lookup(hostname, { all: true, verbatim: true });
 }
-/** Public HTTPS only: no userinfo, non-default port, private/link-local scope. */
+/**
+ * Public HTTPS only: no userinfo, non-default port, private/link-local scope.
+ * Literal IP hosts are checked strictly; resolved DNS answers may additionally
+ * use proxy fake-IP ranges so local interception does not break vendors.
+ */
 async function assertPublicHttps(value, lookupImpl, { allowQuery = false } = {}) {
   let url;
   try {
@@ -174,7 +226,7 @@ async function assertPublicHttps(value, lookupImpl, { allowQuery = false } = {})
     : [];
   if (
     addresses.length === 0 ||
-    addresses.some((address) => !address || isPrivateIp(address))
+    addresses.some((address) => !address || isBlockedResolvedIp(address))
   )
     throw error('E_AUDIO_ENDPOINT', '服务地址指向不允许的网络范围');
   return url;
