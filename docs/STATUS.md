@@ -10,6 +10,7 @@
 - `sessions.js`：Audio requests 行补注"选区条发送即显式云请求"；Range scoring 行重写为**两阶段**——阶段一不计费：`timeline.resolve` + 新 `timeline.audioProfile` 逐秒响度曲线 + 一次 frame 抽帧（≤4 帧）+ 一次 read_image，融合片段摘要、对话剧本、视频语言与设置页音乐提示词，输出固定列的精确时间轴表（时间段（秒）/情绪状态/强度(1-10)/配器与音色/动态与音量/卡点·转场）与 ≤2000 字符浓缩器乐提示，展示并**结束回合等待用户确认**；阶段二仅在确认后 `audio.generate kind music WITHOUT provider or score` 走页面配置模型，禁止 procedural 替代（未配置模型或云失败才回落且须如实说明）。为守住 8000 上下文预算，压缩了 Audio requests 行措辞（实测 contextChars 6075、含自定义块 7940）。
 - Host 新 Tool 面 `timeline.audioProfile(projectId,fromFrame,toFrame)`（`host/bridge.js`+`host/tool.js`）：只读复用既有 UI-only visuals 波形队列做门面——inspect 找选区内未静音可听片段（≤16 窗，单窗 20s/整体 60s 截止），把每窗 256 个波形峰值折叠为逐秒最大峰值曲线（>600s 自动并桶），返回 curve/sampledClips/note；`timeline.visuals.*` 对 Tool 仍封闭。
 - `client.js`：发送到聊天自动附加固定请求句（新 locale key `rangeRequest`，zh/en），`rangeSent` 状态文案同步说明将调用配置的音乐模型。
+- 配套 skill `skills/music-scoring-library/SKILL.md`（配乐库）：八类短剧题材（复仇霸总/甜宠/悬疑权谋古风/仙侠玄幻/虐恋/喜剧萌宝/都市职场/历史穿越）的核心情绪、乐器音色、BPM 与设计要点表，指导逐秒表各列取值、响度曲线→强度锚定、卡点对齐片段边界、浓缩云提示词的写法与中→英乐器翻译对照；`audio.guide` 现拼接返回 audio-creation+配乐库两份 skill（audio-creation 的选区小节同步改为两阶段+确认门控）；package.json files 与 stage-dev 清单已收录。
 - 本机（Windows）验证：model-contract 扩至 40 项断言（两阶段措辞、audioProfile 参数白名单/校验/行为桩测试：静音轨与无声片段跳过、曲线折叠 [0.2,0.2,0.9,0.9]）、audio provider 合约、plugin-settings、smoke-client 86 项、check.mjs 58/0 全绿；真实对话端到端（逐秒表→确认→云生成）待用户实机复测。
 
 ## 分支中：DNS 围栏放行代理 fake-IP + 选区配乐携带片段摘要

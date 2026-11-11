@@ -18,7 +18,7 @@ try{
  bridge.sessions.projectForSession=async id=>id==='audio-agent'?projectId:null;
  const tool=createVideoTool(bridge),exec={agent:{session:{id:'audio-agent'}}};
  const call=async(action,params={})=>(await tool.execute({action,projectId,...params},exec)).result;
- const guide=await call('audio.guide');assert(guide.skill.includes('provider `procedural`'));assert(guide.skill.includes('keepTiming:true'));assert(!guide.skill.includes('keepDuration'));checks++;
+ const guide=await call('audio.guide');assert(guide.skill.includes('provider `procedural`'));assert(guide.skill.includes('keepTiming:true'));assert(!guide.skill.includes('keepDuration'));assert(guide.skill.includes('Genre scoring library'),'the companion 配乐库 must ship inside audio.guide');assert(guide.skill.includes('复仇、霸总、逆袭、打脸'));assert(guide.skill.includes('Stage 1 — analysis without billing'),'the range workflow must keep the two-stage confirmation gate');assert(guide.skill.split('\n').find(line=>line.startsWith('{"action":"audio.generate"')),'the procedural example must stay findable');checks++;
  await assert.rejects(()=>tool.execute({action:'audio.guide',projectId:b.projectId},exec));checks++;
  const providers=await call('audio.providers');assert.equal(providers.providers.find(p=>p.id==='procedural').capabilities.offline,true);assert(!('configured'in providers));checks++;
  const example=JSON.parse(guide.skill.split('\n').find(line=>line.startsWith('{"action":"audio.generate"')));
