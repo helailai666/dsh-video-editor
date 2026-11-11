@@ -4,7 +4,7 @@ description: Genre scoring library (配乐库) that expands how music prompts ar
 ---
 # Genre scoring library (配乐库)
 
-Creative reference for scoring Chinese short-drama (短剧) footage. It never overrides the fixed safety, billing, revision or confirmation rules; it only enriches the mood, instrumentation, tempo and hit-point design you write into the timeline table and the condensed instrumental prompt.
+Creative reference for scoring Chinese short-drama (短剧) footage. It never overrides the fixed safety, billing, revision or confirmation rules; it only enriches the mood, instrumentation, tempo and hit-point design you write into the timeline table and the condensed instrumental prompt. For high-frequency calm→conflict switching (fast reversals, face-slap hooks), also follow the bundled 快节奏情绪突变设计器 (drama-beat-shifts) skill.
 
 ## Match the genre first
 
@@ -41,6 +41,13 @@ The billed `audio.generate` text is ONE short paragraph (<=2000 chars, instrumen
 4. the dynamic arc and hit-point plan in one clause.
 
 If the configured model responds better to English, translate faithfully: 失真贝斯→distorted bass, 铜管→brass stabs, 古筝→guzheng (Chinese zither), 二胡→erhu, 编钟→bianzhong chimes, 大鼓→taiko-style war drum, 木琴→xylophone, 空灵人声吟唱→ethereal wordless vocals. Keep cultural instruments named; do not replace them with generic "orchestral".
+
+## Reverse alignment (why the song never matches the clock)
+
+Cloud music models write songs from a style description; they do not follow per-second timelines or an exact length. Two consequences:
+
+- Write the billed prompt as RELATIVE structure, not clock times: "sparse tense opening, slow build to a heavy climax around the middle, sudden drop to near silence, final hit to close" — plus the genre sentence, instruments and BPM from the row. Never promise the model a 12s explosion or a 31s hit; it will ignore them.
+- After generation, find where those landmarks actually landed: `timeline.audioProfile(projectId,assetId:<asset>)` gives the whole-track envelope; pick the window whose arc best fits the confirmed table and place it with `sourceInFrame`. The table stays the design document you grade the chosen window against — report honestly where the song differs (climax early/late, missing hit) and offer to re-pick the window or regenerate with a revised prompt.
 
 ## Honesty rules
 

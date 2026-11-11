@@ -231,6 +231,25 @@ async function method(name, p) {
       validateAssetRemove({ projectId: p.projectId, assetId: p.assetId });
       store.assertNotClosing(p.projectId);
       return store.queue(p.projectId, () => media.derive(p));
+    case "asset.envelope": {
+      keys(p, ["projectId", "assetId"], ["projectId", "assetId"]);
+      validateAssetRemove({ projectId: p.projectId, assetId: p.assetId });
+      store.assertNotClosing(p.projectId);
+      await store.requestOpen(p.projectId);
+      const timelines =
+        store.timelines ?? (store.timelines = new Timelines(store, media));
+      const visuals =
+        store.visuals ??
+        (store.visuals = new TimelineVisuals(timelines, () =>
+          [...jobs.jobs.values()].some(
+            (job) =>
+              !["succeeded", "failed", "cancelled", "timed_out"].includes(
+                job.state,
+              ),
+          ),
+        ));
+      return visuals.envelopeOf(p);
+    }
     case "asset.import":
       validateImportAsset(p);
       return store.importAsset(p);

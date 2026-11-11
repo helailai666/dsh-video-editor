@@ -103,7 +103,7 @@ const METHOD_PARAMS = Object.freeze({
 'timeline.visuals.request': ['projectId','expectedRevision','clipId','startFrame','endFrame','count'],
  'timeline.visuals.status': ['projectId','taskId'],
  'timeline.visuals.cancel': ['projectId','taskId'],
- 'timeline.audioProfile': ['projectId','fromFrame','toFrame'],
+ 'timeline.audioProfile': ['projectId','fromFrame','toFrame','assetId'],
  'timeline.inspect': ['projectId', 'view', 'trackId', 'offset', 'limit'],
 'timeline.apply': ['projectId', 'expectedRevision', 'operationId', 'ops', 'dryRun'],
 'timeline.resolve': ['projectId', 'revision', 'refs'],
@@ -477,7 +477,7 @@ export function validateParams(config, method, params) {
     return {...params};
   }
   if(method.startsWith('timeline.visuals.')) {const next={...params,projectId:allowedProject(config,params.projectId)};if(method.endsWith('request')){next.expectedRevision=revision(params.expectedRevision);if(!/^cl_[a-z0-9]+$/.test(params.clipId)||![params.startFrame,params.endFrame,params.count].every(Number.isSafeInteger)||params.startFrame<0||params.endFrame<=params.startFrame||params.count<1||params.count>4)fail('E_PARAMS','Invalid visual request');}else if(!/^[a-f0-9]{24}$/.test(params.taskId))fail('E_PARAMS','Invalid visual task');return next;}
-  if(method==='timeline.audioProfile'){const next={projectId:allowedProject(config,params.projectId)};if(!Number.isSafeInteger(params.fromFrame)||!Number.isSafeInteger(params.toFrame)||params.fromFrame<0||params.toFrame>108000||params.toFrame<=params.fromFrame)fail('E_PARAMS','Invalid audio profile range','params');next.fromFrame=params.fromFrame;next.toFrame=params.toFrame;return next;}
+  if(method==='timeline.audioProfile'){const next={projectId:allowedProject(config,params.projectId)};const hasAsset=typeof params.assetId==='string'&&/^as_[a-f0-9]{8}$/.test(params.assetId);const hasRange=Number.isSafeInteger(params.fromFrame)&&Number.isSafeInteger(params.toFrame)&&params.fromFrame>=0&&params.toFrame<=108000&&params.toFrame>params.fromFrame;if(hasAsset===hasRange)fail('E_PARAMS','Provide either assetId or fromFrame/toFrame for the audio profile','params');if(hasAsset)next.assetId=params.assetId;else{next.fromFrame=params.fromFrame;next.toFrame=params.toFrame;}return next;}
   if (['timeline.references','timeline.inspect','timeline.apply','timeline.resolve','timeline.undo','timeline.redo','scene.compose','scene.inspect'].includes(method)) {
     const next={...params,projectId:allowedProject(config,params.projectId)};
     if(['timeline.apply','timeline.undo','timeline.redo','scene.compose'].includes(method)){next.expectedRevision=revision(params.expectedRevision);next.operationId=operationId(params.operationId);}
@@ -1837,7 +1837,9 @@ export class VideoBridge {
    * scoring uses this to feel the scene's noise without hearing the media.
    */
   async audioProfile(params) {
-    const { projectId, fromFrame, toFrame } = params;
+    const { projectId } = params;
+    if (params.assetId !== undefined) return this.assetAudioCurve(projectId, params.assetId);
+    const { fromFrame, toFrame } = params;
     const timeline = await this.callClient('timeline.inspect', { projectId });
     this.rememberFacts({ ...timeline, timeline: true });
     const revision = timeline.revision;
@@ -1889,6 +1891,36 @@ export class VideoBridge {
         sampled.length === 0
           ? 'no audible sampled audio inside the range'
           : 'max waveform peak per bucket, 0..1 of full scale; muted tracks and silent scenes are excluded',
+    };
+  }
+  /** Whole-asset loudness curve for picking an insert window before placement. */
+  async assetAudioCurve(projectId, assetId) {
+    const env = await this.callClient('asset.envelope', { projectId, assetId });
+    let bucketSeconds = Number(env.bucketSeconds) > 0 ? Number(env.bucketSeconds) : 1;
+    let peaks = Array.isArray(env.peaks) ? env.peaks.map((v) => Number(v) || 0) : [];
+    let rms = Array.isArray(env.rms) ? env.rms.map((v) => Number(v) || 0) : [];
+    if (peaks.length > 1200) {
+      const fold = Math.ceil(peaks.length / 1200);
+      const p2 = [];
+      const r2 = [];
+      for (let i = 0; i < peaks.length; i += fold) {
+        p2.push(Math.max(...peaks.slice(i, i + fold)));
+        const slice = rms.slice(i, i + fold);
+        r2.push(Math.sqrt(slice.reduce((n, v) => n + v * v, 0) / Math.max(1, slice.length)));
+      }
+      peaks = p2;
+      rms = r2;
+      bucketSeconds *= fold;
+    }
+    return {
+      projectId,
+      assetId,
+      bucketSeconds: Math.round(bucketSeconds * 1000) / 1000,
+      durationSeconds: Math.round(peaks.length * bucketSeconds * 10) / 10,
+      curve: peaks.map((v) => Math.round(v * 100) / 100),
+      rmsCurve: rms.map((v) => Math.round(v * 100) / 100),
+      materialPeak: Math.round((Number(env.materialPeak) || 0) * 100) / 100,
+      note: 'whole-asset envelope at ~1s buckets; pick the window whose arc matches the confirmed table and insert it with sourceInFrame',
     };
   }
   /** One visuals window -> waveform peaks, or null when it cannot be sampled. */
@@ -1965,7 +1997,7 @@ export class VideoBridge {
       else if(method==='audio.model.remove')result=await this.audio.removeModel(normalized.modelId);
       else if(method==='audio.model.default')result=await this.audio.setDefaultModel(normalized.modelId);
       else if(method==='audio.check')result=await this.audio.check(normalized.modelId);
-      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))};
+      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/drama-beat-shifts/SKILL.md',import.meta.url),'utf8'))};
       else if(method==='audio.recipe')result=await this.audio.recipe(normalized.projectId,normalized.jobId);
       else if(method==='audio.generate')result=await this.audio.generate(normalized);
       else if(method==='audio.cancel')result=await this.audio.cancel(normalized.projectId,normalized.jobId);
