@@ -392,6 +392,275 @@ try {
   assert.equal(orphanView.error.uncertain, true);
   await orphan.dispose();
 
+  // ── Vendor protocols: StepFun base64, Suno create/query, MiniMax hex ──
+  const vendorRoot = join(root, 'vendor');
+  const vendorStore = new PluginSettingsStore({ path: join(vendorRoot, 'plugin-settings.json') });
+  await vendorStore.prepare();
+  const stepSnap = await vendorStore.saveModel({ name: 'Step', protocol: 'stepfun', baseUrl: 'https://api.stepfun.com', remoteModel: '' });
+  const stepId = stepSnap.musicModels.find((m) => m.name === 'Step').id;
+  assert.equal(stepSnap.musicModels.find((m) => m.name === 'Step').remoteModel, 'stepaudio-3-music-preview');
+  const sunoSnap = await vendorStore.saveModel({ name: 'Suno', protocol: 'suno-inspiration', baseUrl: 'https://www.suno-api.io', remoteModel: '' });
+  const sunoId = sunoSnap.musicModels.find((m) => m.name === 'Suno').id;
+  assert.equal(sunoSnap.musicModels.find((m) => m.name === 'Suno').remoteModel, 'suno-v6');
+  const mmSnap = await vendorStore.saveModel({ name: 'MM', protocol: 'minimax', baseUrl: 'https://api.minimax.cn', remoteModel: '' });
+  const mmId = mmSnap.musicModels.find((m) => m.name === 'MM').id;
+  assert.equal(mmSnap.musicModels.find((m) => m.name === 'MM').remoteModel, 'music-3.0');
+  const settle = async (svc, job) => {
+    let view = job;
+    for (let i = 0; i < 300 && ['queued', 'running', 'downloading'].includes((view = await svc.status('demo', job.jobId)).state); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    return view;
+  };
+  let stepSubmits = 0;
+  const stepSvc = new AudioService({
+    root: join(vendorRoot, 'step'),
+    settingsStore: vendorStore,
+    pollIntervalMs: 5,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: { assetId: 'as_step001', kind: 'audio' } }),
+    fetch: async (url, init = {}) => {
+      const body = JSON.parse(init.body || '{}');
+      if (String(url).endsWith('/submit')) {
+        stepSubmits++;
+        assert.equal(body.task, 'text_to_music');
+        assert.equal(body.model_id, 'stepaudio-3-music-preview');
+        assert.equal(body.instrumental, true);
+        assert.equal(body.caption, '对抗节奏');
+        assert.match(init.headers.Authorization, /Bearer sk-step/);
+        return new Response(JSON.stringify({ task_id: 'st-1' }));
+      }
+      assert.equal(String(url), 'https://api.stepfun.com/v1/audio/music/query');
+      assert.equal(body.task_id, 'st-1');
+      return new Response(JSON.stringify({ status: 'SUCCESS', audio: Buffer.from('step-audio-bytes').toString('base64') }));
+    },
+  });
+  await stepSvc.writeKey(stepId, 'sk-step');
+  let sj = await stepSvc.generate({ projectId: 'demo', operationId: 'step_score', kind: 'music', text: '对抗节奏', modelId: stepId });
+  sj = await settle(stepSvc, sj);
+  assert.equal(sj.state, 'succeeded', JSON.stringify(sj));
+  assert.equal(stepSubmits, 1);
+  assert.equal(sj.remoteTaskId, 'st-1');
+  const stepRecipe = await stepSvc.recipe('demo', sj.jobId);
+  assert.equal(stepRecipe.modelId, stepId);
+  assert.doesNotMatch(JSON.stringify(stepRecipe), /api\.stepfun\.com|sk-step/);
+  await stepSvc.dispose();
+  // StepFun connection probe: 404 on the fake task proves auth+network without billing.
+  const probeSvc = new AudioService({
+    root: join(vendorRoot, 'probe'),
+    settingsStore: vendorStore,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: {} }),
+    fetch: async (url, init = {}) => {
+      assert.equal(String(url), 'https://api.stepfun.com/v1/audio/music/query');
+      assert.equal(JSON.parse(init.body).task_id, 'dsh-video-probe');
+      return new Response('{}', { status: 404 });
+    },
+  });
+  await probeSvc.writeKey(stepId, 'sk-step');
+  assert.equal((await probeSvc.check(stepId)).connected, true);
+  const probe401 = new AudioService({
+    root: join(vendorRoot, 'probe'),
+    settingsStore: vendorStore,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: {} }),
+    fetch: async () => new Response('{}', { status: 401 }),
+  });
+  await assert.rejects(() => probe401.check(stepId), (e) => e.code === 'E_AUDIO_AUTH');
+  await probeSvc.dispose();
+  let sunoPosts = 0;
+  let sunoProgress = 0;
+  const sunoSvc = new AudioService({
+    root: join(vendorRoot, 'suno'),
+    settingsStore: vendorStore,
+    pollIntervalMs: 5,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: { assetId: 'as_suno01', kind: 'audio' } }),
+    fetch: async (url, init = {}) => {
+      const u = String(url);
+      if (u.endsWith('/api/music/create')) {
+        sunoPosts++;
+        const b = JSON.parse(init.body);
+        assert.equal(b.description, '轻快配乐');
+        assert.equal(b.instrumental, true);
+        assert.equal(b.model, 'suno-v6');
+        assert.equal(b.accept_mode, 'async', 'paid submit must not hold a long connection');
+        assert.equal(init.headers['Idempotency-Key'], 'suno_score', 'replay must not double-bill');
+        return new Response(JSON.stringify({ success: true, data: { request_id: 'ac_probe1', status: 'queued', tasks: [] } }), { status: 202 });
+      }
+      if (u.includes('/api/music/requests/ac_probe1')) {
+        sunoProgress++;
+        if (sunoProgress === 1)
+          return new Response(JSON.stringify({ success: true, data: { request_id: 'ac_probe1', status: 'queued', tasks: [] } }));
+        return new Response(JSON.stringify({ success: true, data: { request_id: 'ac_probe1', status: 'processing', tasks: [{ index: 0, status: 'pending', song_id: 's1' }, { index: 1, status: 'pending', song_id: 's2' }] } }));
+      }
+      if (u.endsWith('/api/music/query')) {
+        const b = JSON.parse(init.body);
+        assert.deepEqual(b.song_ids, ['s1', 's2']);
+        return new Response(JSON.stringify({ data: [{ song_id: 's1', status: 'completed', duration: 95, audio_url: 'https://cdn.example.com/s1.mp3' }] }));
+      }
+      assert.equal(u, 'https://cdn.example.com/s1.mp3');
+      assert.equal(init.headers?.Authorization, undefined, 'suno audio download must not carry the key');
+      return new Response(Buffer.from('suno-mp3-bytes'));
+    },
+  });
+  await sunoSvc.writeKey(sunoId, 'sk-suno');
+  let uj = await sunoSvc.generate({ projectId: 'demo', operationId: 'suno_score', kind: 'music', text: '轻快配乐', modelId: sunoId });
+  uj = await settle(sunoSvc, uj);
+  assert.equal(uj.state, 'succeeded', JSON.stringify(uj));
+  assert.equal(sunoPosts, 1);
+  assert.equal(sunoProgress, 2);
+  assert.equal(uj.remoteTaskId, 's1,s2', 'real song ids replace the accept id once issued');
+  assert.equal(uj.usage.duration, 95);
+  await sunoSvc.dispose();
+  // Restart before song ids exist: the persisted accept id resumes by querying
+  // the free progress endpoint only — the billed submit is never repeated.
+  const sunoResumeRoot = join(vendorRoot, 'suno-resume');
+  await mkdir(sunoResumeRoot, { recursive: true });
+  const sunoResumeJobId = 'audio_' + randomUUID();
+  await writeFile(join(sunoResumeRoot, 'audio-jobs.json'), JSON.stringify({ jobs: [{ jobId: sunoResumeJobId, projectId: 'demo', operationId: 'suno_resume', provider: 'custom-music', kind: 'music', hash: 'x'.repeat(64), modelId: sunoId, remoteTaskId: 'req:ac_resume', state: 'running', createdAt: new Date().toISOString() }] }));
+  await writeFile(join(sunoResumeRoot, sunoResumeJobId + '.recipe.json'), JSON.stringify({ projectId: 'demo', operationId: 'suno_resume', provider: 'custom-music', kind: 'music', text: '轻快配乐', modelId: sunoId }));
+  let sunoResumePosts = 0;
+  let sunoResumeProgress = 0;
+  let sunoResumeQueries = 0;
+  let sunoResumeImported = 0;
+  const sunoResumeSvc = new AudioService({
+    root: sunoResumeRoot,
+    settingsStore: vendorStore,
+    pollIntervalMs: 5,
+    lookup: publicLookup,
+    importAudio: async () => { sunoResumeImported++; return { asset: { assetId: 'as_suno02', kind: 'audio' } }; },
+    fetch: async (url, init = {}) => {
+      const u = String(url);
+      if (u.endsWith('/api/music/create') || u.endsWith('/create/custom')) { sunoResumePosts++; return new Response('{}'); }
+      if (u.includes('/api/music/requests/ac_resume')) {
+        sunoResumeProgress++;
+        return new Response(JSON.stringify({ success: true, data: { status: 'processing', tasks: [{ index: 0, status: 'pending', song_id: 's9' }] } }));
+      }
+      if (u.endsWith('/api/music/query')) {
+        sunoResumeQueries++;
+        return new Response(JSON.stringify({ data: [{ song_id: 's9', status: 'completed', duration: 60, audio_url: 'https://cdn.example.com/s9.mp3' }] }));
+      }
+      assert.equal(u, 'https://cdn.example.com/s9.mp3');
+      return new Response(Buffer.from('resumed-bytes'));
+    },
+  });
+  await sunoResumeSvc.writeKey(sunoId, 'sk-suno');
+  await sunoResumeSvc.resumeJobs();
+  let srj;
+  for (let i = 0; i < 200 && ['queued', 'running', 'downloading'].includes((srj = await sunoResumeSvc.status('demo', sunoResumeJobId)).state); i++)
+    await new Promise((r) => setTimeout(r, 20));
+  assert.equal(srj.state, 'succeeded', JSON.stringify(srj));
+  assert.equal(sunoResumePosts, 0, 'suno resume must never repeat the billed submit');
+  assert.ok(sunoResumeProgress >= 1);
+  assert.ok(sunoResumeQueries >= 1);
+  assert.equal(sunoResumeImported, 1);
+  assert.equal(srj.remoteTaskId, 's9', 'the accept id is replaced by the real song id');
+  await sunoResumeSvc.dispose();
+  // Legacy synchronous envelope (no accept id) still resolves through query.
+  let legacyPosts = 0;
+  let legacyQueries = 0;
+  const legacySvc = new AudioService({
+    root: join(vendorRoot, 'suno-legacy'),
+    settingsStore: vendorStore,
+    pollIntervalMs: 5,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: { assetId: 'as_suno03', kind: 'audio' } }),
+    fetch: async (url, init = {}) => {
+      const u = String(url);
+      if (u.endsWith('/api/music/create')) {
+        legacyPosts++;
+        assert.equal(JSON.parse(init.body).accept_mode, 'async');
+        return new Response(JSON.stringify([{ song_id: 'l1', status: 'pending' }]));
+      }
+      if (u.endsWith('/api/music/query')) {
+        assert.equal(legacyQueries++, 0);
+        return new Response(JSON.stringify([{ song_id: 'l1', status: 'completed', audio_url: 'https://cdn.example.com/l1.mp3' }]));
+      }
+      assert.equal(u, 'https://cdn.example.com/l1.mp3');
+      return new Response(Buffer.from('legacy-bytes'));
+    },
+  });
+  await legacySvc.writeKey(sunoId, 'sk-suno');
+  let lj = await legacySvc.generate({ projectId: 'demo', operationId: 'suno_legacy', kind: 'music', text: '轻快配乐', modelId: sunoId });
+  lj = await settle(legacySvc, lj);
+  assert.equal(lj.state, 'succeeded', JSON.stringify(lj));
+  assert.equal(legacyPosts, 1);
+  assert.equal(legacyQueries, 1);
+  assert.equal(lj.remoteTaskId, 'l1');
+  await legacySvc.dispose();
+  // Suno professional mode posts style_tags to /create/custom and never
+  // exceeds the vendor's 1000 UTF-16-unit limit.
+  const customSnap = await vendorStore.saveModel({ name: 'SunoPro', protocol: 'suno-custom', baseUrl: 'https://www.suno-api.io', remoteModel: '' });
+  const customId = customSnap.musicModels.find((m) => m.name === 'SunoPro').id;
+  assert.equal(customSnap.musicModels.find((m) => m.name === 'SunoPro').remoteModel, 'suno-v6');
+  let customTags = '';
+  const customSvc = new AudioService({
+    root: join(vendorRoot, 'suno-custom'),
+    settingsStore: vendorStore,
+    pollIntervalMs: 5,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: { assetId: 'as_suno04', kind: 'audio' } }),
+    fetch: async (url, init = {}) => {
+      const u = String(url);
+      if (u.endsWith('/api/music/create/custom')) {
+        const b = JSON.parse(init.body);
+        assert.equal(b.style_tags !== undefined, true);
+        assert.equal(b.description, undefined, 'custom mode must not send description');
+        customTags = b.style_tags;
+        return new Response(JSON.stringify({ success: true, data: { request_id: 'ac_c1', status: 'queued', tasks: [] } }), { status: 202 });
+      }
+      if (u.includes('/api/music/requests/ac_c1'))
+        return new Response(JSON.stringify({ success: true, data: { status: 'completed', tasks: [{ index: 0, status: 'completed', song_id: 'c1', audio_url: 'https://cdn.example.com/c1.mp3' }] } }));
+      assert.equal(u, 'https://cdn.example.com/c1.mp3');
+      return new Response(Buffer.from('custom-bytes'));
+    },
+  });
+  await customSvc.writeKey(customId, 'sk-suno');
+  const longTag = Array(240).fill('紧张弦乐').join(',');
+  let scj = await customSvc.generate({ projectId: 'demo', operationId: 'suno_custom', kind: 'music', text: longTag, modelId: customId });
+  scj = await settle(customSvc, scj);
+  assert.equal(scj.state, 'succeeded', JSON.stringify(scj));
+  assert.ok(customTags.length <= 1000, `style_tags must be clipped, got ${customTags.length}`);
+  assert.equal(customTags.split(',').length, 200, 'clip must land on a tag boundary');
+  assert.equal(customTags.endsWith(','), false);
+  await customSvc.dispose();
+  let mmPosts = 0;
+  const mmSvc = new AudioService({
+    root: join(vendorRoot, 'mm'),
+    settingsStore: vendorStore,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: { assetId: 'as_mm00001', kind: 'audio' } }),
+    fetch: async (url, init = {}) => {
+      mmPosts++;
+      assert.equal(String(url), 'https://api.minimax.cn/v1/music_generation');
+      const b = JSON.parse(init.body);
+      assert.equal(b.model, 'music-3.0');
+      assert.equal(b.is_instrumental, true);
+      assert.equal(b.output_format, 'hex');
+      return new Response(JSON.stringify({ data: { audio: Buffer.from('minimax-mp3-bytes').toString('hex'), status: 2 }, extra_info: { music_duration: 12345 }, base_resp: { status_code: 0 } }));
+    },
+  });
+  await mmSvc.writeKey(mmId, 'sk-mm');
+  let mj = await mmSvc.generate({ projectId: 'demo', operationId: 'mm_score', kind: 'music', text: '民谣配乐', modelId: mmId });
+  mj = await settle(mmSvc, mj);
+  assert.equal(mj.state, 'succeeded', JSON.stringify(mj));
+  assert.equal(mmPosts, 1);
+  assert.equal(mj.usage.duration, 12.345);
+  await mmSvc.dispose();
+  // MiniMax business error surfaces as a typed failure, never a silent success.
+  const mmErr = new AudioService({
+    root: join(vendorRoot, 'mmerr'),
+    settingsStore: vendorStore,
+    lookup: publicLookup,
+    importAudio: async () => ({ asset: {} }),
+    fetch: async () => new Response(JSON.stringify({ base_resp: { status_code: 1004 } })),
+  });
+  await mmErr.writeKey(mmId, 'sk-mm');
+  let ej = await mmErr.generate({ projectId: 'demo', operationId: 'mm_err', kind: 'music', text: 'x', modelId: mmId });
+  ej = await settle(mmErr, ej);
+  assert.equal(ej.state, 'failed');
+  assert.equal(ej.error.code, 'E_AUDIO_PROVIDER');
+  await mmErr.dispose();
   // Security fences: private DNS, API redirects, download redirects.
   const fenceRoot = join(root, 'fence');
   const fenceStore = new PluginSettingsStore({ path: join(fenceRoot, 'plugin-settings.json') });

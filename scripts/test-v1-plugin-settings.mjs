@@ -51,6 +51,12 @@ try {
   assert.match(String(await code(Promise.resolve().then(() => normalizeMusicModel({ name: 'x', protocol: 'openai', baseUrl: 'https://a.example.com', remoteModel: 'm' })))), /E_PARAMS/);
   const created = normalizeMusicModel({ name: '我的配乐模型', protocol: 'qianwen-async', baseUrl: 'https://service.example.com', remoteModel: 'music-x' });
   assert.match(created.id, /^music_[a-f0-9]{16}$/);
+  // Vendor protocols fill their documented default remote model when blank.
+  assert.equal(normalizeMusicModel({ name: 's', protocol: 'stepfun', baseUrl: 'https://api.stepfun.com', remoteModel: '' }).remoteModel, 'stepaudio-3-music-preview');
+  assert.equal(normalizeMusicModel({ name: 's', protocol: 'suno-inspiration', baseUrl: 'https://www.suno-api.io' }).remoteModel, 'suno-v6');
+  assert.equal(normalizeMusicModel({ name: 's', protocol: 'suno-custom', baseUrl: 'https://www.suno-api.io', remoteModel: 'suno-v6-wild' }).remoteModel, 'suno-v6-wild');
+  assert.equal(normalizeMusicModel({ name: 's', protocol: 'minimax', baseUrl: 'https://api.minimax.cn', remoteModel: '' }).remoteModel, 'music-3.0');
+  assert.match(String(await code(Promise.resolve().then(() => normalizeMusicModel({ name: 's', protocol: 'qianwen-sync', baseUrl: 'https://a.example.com', remoteModel: '' })))), /E_PARAMS/);
 
   await store.saveModel(created);
   assert.equal(store.get().musicModels.length, 1);

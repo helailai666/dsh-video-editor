@@ -18,9 +18,29 @@ const error = (code, message, uncertain = false) =>
 const digest = (v) =>
   createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const MUSIC_MODEL_ID = /^(qianwen|music_[a-f0-9]{16})$/;
-const REMOTE_TASK_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+const REMOTE_TASK_ID = /^[A-Za-z0-9._:,-]{1,160}$/;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
+// StepFun (base64) and MiniMax (hex) return the audio inside the JSON body.
+const MAX_INLINE_AUDIO_BYTES = 96 * 1024 * 1024;
+const VENDOR_POLL_MS = { stepfun: 5000, 'suno-inspiration': 2000, 'suno-custom': 2000 };
+const VENDOR_TIMEOUT_MS = { stepfun: 600000, 'suno-inspiration': 600000, 'suno-custom': 600000, minimax: 420000 };
+// Suno counts style_tags in UTF-16 units and answers an over-long value with
+// HTTP 400 before any billing, so the field is clipped on a separator instead.
+const SUNO_STYLE_TAGS_LIMIT = 1000;
+/** Trim a string to `limit` UTF-16 units, preferring a nearby list separator. */
+function clipUnits(value, limit) {
+  if (value.length <= limit) return value;
+  const head = value.slice(0, limit);
+  const cut = Math.max(
+    head.lastIndexOf(','),
+    head.lastIndexOf('，'),
+    head.lastIndexOf('、'),
+    head.lastIndexOf(';'),
+    head.lastIndexOf('；'),
+  );
+  return cut > 20 ? head.slice(0, cut) : head;
+}
 async function atomic(path, value) {
   const temp = path + '.' + randomUUID() + '.tmp';
   try {
@@ -66,12 +86,14 @@ function isPlainObject(value) {
 }
 export function mapAudioError(status, code) {
   if (status === 401)
-    return error('E_AUDIO_AUTH', '千问云密钥无效，请重新配置');
+    return error('E_AUDIO_AUTH', 'API Key 无效，请在设置页重新配置');
+  if (status === 402)
+    return error('E_AUDIO_ENTITLEMENT', '账户额度不足，请充值后重试');
   if (status === 403)
     return error('E_AUDIO_ENTITLEMENT', '该模型未开通，请申请权限或导入音频');
   if (status === 429)
     return error('E_AUDIO_RATE_LIMIT', '供应商限流，请稍后手动重试');
-  if (/Inspection|inspection/.test(code ?? ''))
+  if (status === 451 || /Inspection|inspection/.test(code ?? ''))
     return error('E_AUDIO_CONTENT', '生成内容未通过审核，请修改描述');
   if (status === 400)
     return error('E_AUDIO_PARAMS', '供应商不接受本次参数，请缩短或修改描述');
@@ -174,19 +196,19 @@ const sleep = (ms, signal) =>
     }
     signal?.addEventListener('abort', onAbort, { once: true });
   });
-async function responseText(response) {
+async function responseText(response, maxBytes = MAX_JSON_BYTES) {
   let text;
   try {
     text = await response.text();
   } catch {
     throw error('E_AUDIO_PROVIDER', '供应商返回格式异常', true);
   }
-  if (text.length > MAX_JSON_BYTES)
-    throw error('E_AUDIO_PROTOCOL', '供应商响应超过 4 MiB', true);
+  if (text.length > maxBytes)
+    throw error('E_AUDIO_PROTOCOL', '供应商响应超过上限', true);
   return text;
 }
-async function parseJsonResponse(response) {
-  const text = await responseText(response);
+async function parseJsonResponse(response, { maxBytes = MAX_JSON_BYTES } = {}) {
+  const text = await responseText(response, maxBytes);
   let data = null;
   try {
     data = JSON.parse(text);
@@ -362,9 +384,10 @@ export class QianwenProvider {
   }
 }
 /**
- * Page-configured music service (qianwen-compatible sync or async protocol).
- * API requests carry the key; artifact downloads never do and re-validate
- * every URL/redirect against the public-HTTPS fence.
+ * Page-configured music service. Protocols: qianwen-compatible sync/async,
+ * StepFun (submit/query + base64), Suno (create + song query + audio URL),
+ * MiniMax (synchronous hex). API requests carry the key; artifact downloads
+ * never do and re-validate every URL/redirect against the public-HTTPS fence.
  */
 export class CustomMusicProvider {
   constructor({
@@ -379,7 +402,11 @@ export class CustomMusicProvider {
     this.getKey = getKey;
     this.fetch = fetchImpl;
     this.lookup = lookup;
-    this.pollIntervalMs = pollIntervalMs;
+    this.pollIntervalMs = Math.max(
+      pollIntervalMs,
+      VENDOR_POLL_MS[model.protocol] || 0,
+    );
+    this.requestTimeoutMs = VENDOR_TIMEOUT_MS[model.protocol] ?? null;
   }
   capabilities() {
     return { tts: false, sfx: false, music: true };
@@ -392,7 +419,91 @@ export class CustomMusicProvider {
   async apiUrl(path) {
     return assertPublicHttps(`${this.model.baseUrl}${path}`, this.lookup);
   }
+  /** POST a JSON body to the configured service origin. */
+  async postJson(path, body, { signal, queryRetry = false, headers = null } = {}) {
+    const url = await this.apiUrl(path);
+    const auth = await this.authorizedHeaders();
+    try {
+      return await this.fetch(url.href, {
+        method: 'POST',
+        headers: { ...auth, ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+        redirect: 'manual',
+      });
+    } catch {
+      if (queryRetry)
+        throw error('E_AUDIO_QUERY_RETRY', '任务查询网络异常，稍后自动重试');
+      throw error(
+        'E_AUDIO_NETWORK',
+        '连接中断；供应商可能已受理，请勿连续重试',
+        true,
+      );
+    }
+  }
+  /** Authenticated GET used by the free Suno request-progress endpoint. */
+  async getPath(path, { signal, queryRetry = false } = {}) {
+    const url = await this.apiUrl(path);
+    const headers = await this.authorizedHeaders();
+    try {
+      return await this.fetch(url.href, {
+        method: 'GET',
+        headers,
+        signal,
+        redirect: 'manual',
+      });
+    } catch {
+      if (queryRetry)
+        throw error('E_AUDIO_QUERY_RETRY', '任务查询网络异常，稍后自动重试');
+      throw error(
+        'E_AUDIO_NETWORK',
+        '连接中断；供应商可能已受理，请勿连续重试',
+        true,
+      );
+    }
+  }
+  /** Billed-submit-free probe used by the settings page "test connection". */
+  async probe(path, { method = 'POST', body } = {}) {
+    const url = await this.apiUrl(path);
+    const headers = await this.authorizedHeaders();
+    let r;
+    try {
+      r = await this.fetch(url.href, {
+        method,
+        headers:
+          body === undefined
+            ? headers
+            : { ...headers, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      throw error('E_AUDIO_NETWORK', '无法连接所选音乐模型服务');
+    }
+    if (r.status >= 300 && r.status < 400)
+      throw error('E_AUDIO_ENDPOINT', '服务连接发生重定向，请检查 Base URL');
+    if (r.status === 401 || r.status === 403) throw mapAudioError(r.status);
+    // 400/404 on the probe payload prove auth and network are reachable.
+    if (!(r.ok || r.status === 400 || r.status === 404))
+      throw mapAudioError(r.status);
+    return {
+      connected: true,
+      note: '连接与密钥可用；具体音乐模型权限以生成结果为准',
+    };
+  }
   async check() {
+    const protocol = this.model.protocol;
+    if (protocol === 'stepfun')
+      return this.probe('/v1/audio/music/query', {
+        body: { task_id: 'dsh-video-probe' },
+      });
+    if (protocol === 'suno-inspiration' || protocol === 'suno-custom')
+      return this.probe('/api/music/requests/dsh-video-probe', {
+        method: 'GET',
+      });
+    if (protocol === 'minimax')
+      return this.probe('/v1/music_generation', { body: {} });
     const headers = await this.authorizedHeaders();
     const url = await this.apiUrl('/compatible-mode/v1/models');
     let r;
@@ -418,6 +529,298 @@ export class CustomMusicProvider {
    * after a restart for jobs whose task id was persisted before.
    */
   async generate(req, { signal, onTaskId, resumeTaskId }) {
+    const protocol = this.model.protocol;
+    if (protocol === 'stepfun')
+      return this.generateStepfun(req, { signal, onTaskId, resumeTaskId });
+    if (protocol === 'suno-inspiration' || protocol === 'suno-custom')
+      return this.generateSuno(req, { signal, onTaskId, resumeTaskId });
+    if (protocol === 'minimax') return this.generateMinimax(req, { signal });
+    return this.generateQianwen(req, { signal, onTaskId, resumeTaskId });
+  }
+  async generateStepfun(req, { signal, onTaskId, resumeTaskId }) {
+    let taskId =
+      typeof resumeTaskId === 'string' && REMOTE_TASK_ID.test(resumeTaskId)
+        ? resumeTaskId
+        : null;
+    if (taskId === null) {
+      const r = await this.postJson(
+        '/v1/audio/music/submit',
+        {
+          task: 'text_to_music',
+          model_id: this.model.remoteModel,
+          caption: req.text,
+          instrumental: true,
+          response_format: 'mp3',
+        },
+        { signal },
+      );
+      const data = await parseJsonResponse(r);
+      taskId =
+        typeof data?.task_id === 'string' && REMOTE_TASK_ID.test(data.task_id)
+          ? data.task_id
+          : null;
+      if (taskId === null)
+        throw error(
+          'E_AUDIO_PROTOCOL',
+          '异步提交未返回任务 ID，请勿盲目重试',
+          true,
+        );
+      // Persist the paid task id before the first poll.
+      if (typeof onTaskId === 'function') await onTaskId(taskId);
+    }
+    for (;;) {
+      let r;
+      try {
+        r = await this.postJson(
+          '/v1/audio/music/query',
+          { task_id: taskId },
+          { signal, queryRetry: true },
+        );
+      } catch (e) {
+        if (e.code === 'E_AUDIO_QUERY_RETRY') {
+          if (signal.aborted) throw e;
+          await sleep(this.pollIntervalMs, signal);
+          continue;
+        }
+        throw e;
+      }
+      if (r.status === 429 || r.status >= 500) {
+        await sleep(this.pollIntervalMs, signal);
+        continue;
+      }
+      const data = await parseJsonResponse(r, {
+        maxBytes: MAX_INLINE_AUDIO_BYTES,
+      });
+      const status = data?.status;
+      if (status === 'SUCCESS') {
+        if (typeof data.audio !== 'string' || !data.audio)
+          throw error('E_AUDIO_PROTOCOL', '异步任务成功但未返回音频', true);
+        const bytes = Buffer.from(data.audio, 'base64');
+        if (!bytes.length)
+          throw error('E_AUDIO_DOWNLOAD', '供应商返回空音频', true);
+        if (bytes.length > MAX_AUDIO_BYTES)
+          throw error('E_AUDIO_DOWNLOAD', '生成文件超过 64 MiB，未导入', true);
+        return {
+          bytes,
+          extension: 'mp3',
+          usage: null,
+          model: this.model.remoteModel,
+        };
+      }
+      if (status === 'FAILED') {
+        if (data?.error?.stage === 'censor')
+          throw error('E_AUDIO_CONTENT', '生成内容未通过审核，请修改描述');
+        throw error('E_AUDIO_PROVIDER', '供应商任务生成失败，请调整描述后重试');
+      }
+      if (status === 'PENDING' || status === 'RUNNING') {
+        await sleep(this.pollIntervalMs, signal);
+        continue;
+      }
+      throw error(
+        'E_AUDIO_PROTOCOL',
+        '异步任务状态无法识别，请查看供应商任务记录',
+        true,
+      );
+    }
+  }
+  async generateSuno(req, { signal, onTaskId, resumeTaskId }) {
+    const custom = this.model.protocol === 'suno-custom';
+    const resume =
+      typeof resumeTaskId === 'string' && REMOTE_TASK_ID.test(resumeTaskId)
+        ? resumeTaskId
+        : null;
+    // `req:<request_id>` = accepted but song ids not issued yet;
+    // `s1,s2` = real song ids. Both resume paths only query, never re-submit.
+    let requestId = resume?.startsWith('req:') ? resume.slice(4) : null;
+    let songIds =
+      resume && !resume.startsWith('req:')
+        ? resume.split(',').filter(Boolean)
+        : [];
+    if (requestId === null && songIds.length === 0) {
+      // Accept mode returns 202 immediately: the paid submit never has to hold
+      // a multi-minute connection, and Idempotency-Key makes a lost response
+      // safe to replay without a second charge.
+      const body = custom
+        ? {
+            model: this.model.remoteModel,
+            style_tags: clipUnits(req.text, SUNO_STYLE_TAGS_LIMIT),
+            instrumental: true,
+            accept_mode: 'async',
+          }
+        : {
+            model: this.model.remoteModel,
+            description: req.text,
+            instrumental: true,
+            accept_mode: 'async',
+          };
+      const r = await this.postJson(
+        custom ? '/api/music/create/custom' : '/api/music/create',
+        body,
+        {
+          signal,
+          ...(typeof req.operationId === 'string' && req.operationId.length <= 128
+            ? { headers: { 'Idempotency-Key': req.operationId } }
+            : {}),
+        },
+      );
+      const data = await parseJsonResponse(r);
+      const accepted = [data?.data?.request_id, data?.request_id].find(
+        (id) => typeof id === 'string' && REMOTE_TASK_ID.test(id),
+      );
+      if (accepted) {
+        requestId = accepted;
+        if (typeof onTaskId === 'function') await onTaskId(`req:${requestId}`);
+      } else {
+        songIds = sunoSongList(data)
+          .map((song) => song.song_id || song.id)
+          .filter((id) => typeof id === 'string' && id)
+          .slice(0, 2);
+        if (songIds.length === 0)
+          throw error(
+            'E_AUDIO_PROTOCOL',
+            '提交响应未返回受理号或歌曲任务 ID，请勿盲目重试',
+            true,
+          );
+        if (typeof onTaskId === 'function') await onTaskId(songIds.join(','));
+      }
+    }
+    for (;;) {
+      if (requestId !== null && songIds.length === 0) {
+        let r;
+        try {
+          r = await this.getPath(
+            `/api/music/requests/${encodeURIComponent(requestId)}`,
+            { signal, queryRetry: true },
+          );
+        } catch (e) {
+          if (e.code === 'E_AUDIO_QUERY_RETRY') {
+            if (signal.aborted) throw e;
+            await sleep(this.pollIntervalMs, signal);
+            continue;
+          }
+          throw e;
+        }
+        if (r.status === 429 || r.status >= 500) {
+          await sleep(this.pollIntervalMs, signal);
+          continue;
+        }
+        const progress = await parseJsonResponse(r);
+        const state = String(progress?.data?.status ?? '').toLowerCase();
+        if (state === 'failed')
+          throw error(
+            'E_AUDIO_PROVIDER',
+            `供应商受理失败：${progress?.data?.error_message || '请检查账户额度或描述内容'}`,
+          );
+        const tasks = Array.isArray(progress?.data?.tasks)
+          ? progress.data.tasks
+          : [];
+        const early = tasks.find(
+          (task) => typeof task?.audio_url === 'string' && task.audio_url,
+        );
+        if (early) return this.finish(early, signal);
+        songIds = tasks
+          .map((task) => task?.song_id)
+          .filter((id) => typeof id === 'string' && id)
+          .slice(0, 2);
+        if (songIds.length > 0) {
+          if (typeof onTaskId === 'function')
+            await onTaskId(songIds.join(','));
+          continue;
+        }
+        await sleep(this.pollIntervalMs, signal);
+        continue;
+      }
+      let r;
+      try {
+        r = await this.postJson(
+          '/api/music/query',
+          { song_ids: songIds, model: this.model.remoteModel },
+          { signal, queryRetry: true },
+        );
+      } catch (e) {
+        if (e.code === 'E_AUDIO_QUERY_RETRY') {
+          if (signal.aborted) throw e;
+          await sleep(this.pollIntervalMs, signal);
+          continue;
+        }
+        throw e;
+      }
+      if (r.status === 429 || r.status >= 500) {
+        await sleep(this.pollIntervalMs, signal);
+        continue;
+      }
+      const data = await parseJsonResponse(r);
+      const list = sunoSongList(data);
+      const done = list.find(
+        (song) => typeof song?.audio_url === 'string' && song.audio_url,
+      );
+      if (done) return this.finish(done, signal);
+      if (
+        list.length > 0 &&
+        list.every((song) =>
+          ['failed', 'error', 'rejected'].includes(
+            String(song?.status || '').toLowerCase(),
+          ),
+        )
+      )
+        throw error('E_AUDIO_PROVIDER', '供应商任务生成失败，请调整描述后重试');
+      await sleep(this.pollIntervalMs, signal);
+    }
+  }
+  /** Downloads a finished Suno song and keeps its reported duration. */
+  async finish(song, signal) {
+    const result = await this.download(song.audio_url, signal);
+    const seconds = Number(song.duration);
+    if (Number.isFinite(seconds) && seconds > 0)
+      result.usage = { duration: seconds };
+    return result;
+  }
+  async generateMinimax(req, { signal }) {
+    const r = await this.postJson(
+      '/v1/music_generation',
+      {
+        model: this.model.remoteModel,
+        prompt: req.text,
+        is_instrumental: true,
+        output_format: 'hex',
+        audio_setting: {
+          format: 'mp3',
+          sample_rate: 44100,
+          bitrate: 256000,
+        },
+      },
+      { signal },
+    );
+    const data = await parseJsonResponse(r, {
+      maxBytes: MAX_INLINE_AUDIO_BYTES,
+    });
+    const code = data?.base_resp?.status_code;
+    if (code !== undefined && code !== 0)
+      throw error(
+        'E_AUDIO_PROVIDER',
+        `供应商返回错误（状态码 ${code}），请检查账户权限或调整描述`,
+        true,
+      );
+    const hex = data?.data?.audio;
+    if (typeof hex !== 'string' || !hex)
+      throw error('E_AUDIO_PROVIDER', '供应商未返回音频数据', true);
+    const bytes = Buffer.from(hex, 'hex');
+    if (!bytes.length)
+      throw error('E_AUDIO_DOWNLOAD', '供应商返回空音频', true);
+    if (bytes.length > MAX_AUDIO_BYTES)
+      throw error('E_AUDIO_DOWNLOAD', '生成文件超过 64 MiB，未导入', true);
+    return {
+      bytes,
+      extension: 'mp3',
+      usage: {
+        duration: Number.isFinite(data?.extra_info?.music_duration)
+          ? data.extra_info.music_duration / 1000
+          : null,
+      },
+      model: this.model.remoteModel,
+    };
+  }
+  async generateQianwen(req, { signal, onTaskId, resumeTaskId }) {
     const headers = await this.authorizedHeaders();
     let address;
     let taskId =
@@ -432,25 +835,11 @@ export class CustomMusicProvider {
       };
       if (Number.isInteger(req.durationFrames))
         input.duration = Math.round((req.durationFrames / 30) * 100) / 100;
-      const url = await this.apiUrl(
+      const r = await this.postJson(
         '/api/v1/services/audio/music/generation',
+        { model: this.model.remoteModel, input },
+        { signal },
       );
-      let r;
-      try {
-        r = await this.fetch(url.href, {
-          method: 'POST',
-          headers: { ...headers, 'content-type': 'application/json' },
-          body: JSON.stringify({ model: this.model.remoteModel, input }),
-          signal,
-          redirect: 'manual',
-        });
-      } catch {
-        throw error(
-          'E_AUDIO_NETWORK',
-          '连接中断；供应商可能已受理，请勿连续重试',
-          true,
-        );
-      }
       if (r.status >= 300 && r.status < 400)
         throw error(
           'E_AUDIO_ENDPOINT',
@@ -465,7 +854,11 @@ export class CustomMusicProvider {
             ? data.output.task_id
             : null;
         if (taskId === null)
-          throw error('E_AUDIO_PROTOCOL', '异步提交未返回任务 ID，请勿盲目重试', true);
+          throw error(
+            'E_AUDIO_PROTOCOL',
+            '异步提交未返回任务 ID，请勿盲目重试',
+            true,
+          );
         // Persist the paid task id before the first poll.
         if (typeof onTaskId === 'function') await onTaskId(taskId);
       } else {
@@ -514,8 +907,7 @@ export class CustomMusicProvider {
           throw error('E_AUDIO_PROTOCOL', '异步任务成功但未返回音频地址', true);
         return data.output.audio.url;
       }
-      if (status === 'FAILED')
-        throw mapAudioError(400, data?.code ?? 'FAILED');
+      if (status === 'FAILED') throw mapAudioError(400, data?.code ?? 'FAILED');
       if (status === 'CANCELED')
         throw error('E_AUDIO_CANCELLED', '供应商任务已取消');
       if (status === 'PENDING' || status === 'RUNNING') {
@@ -570,6 +962,14 @@ export class CustomMusicProvider {
       model: this.model.remoteModel,
     };
   }
+}
+/** Suno returns either a bare array or a {data|songs:[...]} envelope. */
+function sunoSongList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.songs)) return payload.songs;
+  if (payload?.song_id || payload?.id) return [payload];
+  return [];
 }
 export class LocalSayProvider {
   constructor() {
@@ -1227,7 +1627,10 @@ export class AudioService {
     });
   }
   async run(j, req, p, control, resumeTaskId) {
-    const timer = setTimeout(() => control.abort('timeout'), this.timeoutMs);
+    const timer = setTimeout(
+      () => control.abort('timeout'),
+      p?.requestTimeoutMs ?? this.timeoutMs,
+    );
     let file;
     try {
       await this.update(j, { state: 'running' });
