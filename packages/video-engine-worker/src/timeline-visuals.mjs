@@ -64,6 +64,21 @@ export class TimelineVisuals {
   const temporary=path+'.'+randomBytes(6).toString('hex')+'.'+extension;
   try{await build(temporary);const bytes=await readFile(temporary);if(bytes.length>8*1024*1024)fail('E_LIMIT','Visual output too large');await rename(temporary,path);return bytes;}finally{await rm(temporary,{force:true});}
  }
+ // Whole-asset loudness envelope at ~1s buckets, for picking an insert window
+ // before any timeline clip exists (range scoring of full-length cloud songs).
+ async envelopeOf(p){
+  const file=await this.timelines.media.resolveFile({projectId:p.projectId,assetId:p.assetId});
+  if(!file||file.asset.kind==='image')fail('E_PARAMS','Asset has no audio envelope');
+  if(file.asset.kind!=='audio'&&file.asset.hasAudio!==true)fail('E_PARAMS','Asset has no audio');
+  const root=await this.cacheRoot(p.projectId);
+  const abort=new AbortController();
+  const timer=setTimeout(()=>abort.abort(),60000);
+  let data;
+  try{data=await this.envelope(file,root,abort.signal);}finally{clearTimeout(timer);}
+  const level=data.levels.find(x=>x.seconds>=1)??data.levels.at(-1);
+  const round=v=>Math.round(v*100000)/100000;
+  return {assetId:p.assetId,sha256:file.asset.sha256,bucketSeconds:Number(level.seconds.toFixed(4)),peaks:level.peaks.map(round),rms:level.rms.map(round),materialPeak:round(data.peak)};
+ }
  async envelope(file,root,signal){
   const key=digest('peaks-v1:'+file.asset.sha256);
   const bytes=await this.cached(root,key,'json',async output=>{

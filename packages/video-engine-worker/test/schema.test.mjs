@@ -530,6 +530,7 @@ function buildSample(method, state) {
     case "asset.importMedia": return {projectId,sourceName:"logo.png",operationId:"probe-media"};
     case "asset.list": return {projectId};
     case "asset.derive": return {projectId,assetId:"as_00000000",kind:"thumb"};
+    case "asset.envelope": return {projectId,assetId:"as_00000000"};
     case "asset.remove": return {projectId,assetId:"as_00000000",operationId:"probe-remove"};
     case "asset.import":
       return {

@@ -42,6 +42,13 @@ The billed `audio.generate` text is ONE short paragraph (<=2000 chars, instrumen
 
 If the configured model responds better to English, translate faithfully: 失真贝斯→distorted bass, 铜管→brass stabs, 古筝→guzheng (Chinese zither), 二胡→erhu, 编钟→bianzhong chimes, 大鼓→taiko-style war drum, 木琴→xylophone, 空灵人声吟唱→ethereal wordless vocals. Keep cultural instruments named; do not replace them with generic "orchestral".
 
+## Reverse alignment (why the song never matches the clock)
+
+Cloud music models write songs from a style description; they do not follow per-second timelines or an exact length. Two consequences:
+
+- Write the billed prompt as RELATIVE structure, not clock times: "sparse tense opening, slow build to a heavy climax around the middle, sudden drop to near silence, final hit to close" — plus the genre sentence, instruments and BPM from the row. Never promise the model a 12s explosion or a 31s hit; it will ignore them.
+- After generation, find where those landmarks actually landed: `timeline.audioProfile(projectId,assetId:<asset>)` gives the whole-track envelope; pick the window whose arc best fits the confirmed table and place it with `sourceInFrame`. The table stays the design document you grade the chosen window against — report honestly where the song differs (climax early/late, missing hit) and offer to re-pick the window or regenerate with a revised prompt.
+
 ## Honesty rules
 
 - The library shapes taste, not facts: never claim a rendered cloud track matches the table second-by-second; report what the asset actually is after written:true.

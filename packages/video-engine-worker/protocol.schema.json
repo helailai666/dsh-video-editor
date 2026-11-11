@@ -120,6 +120,10 @@
       "request": "#/$defs/request_asset_derive",
       "result": "#/$defs/result_asset_derive"
     },
+    "asset.envelope": {
+      "request": "#/$defs/request_asset_envelope",
+      "result": "#/$defs/result_asset_envelope"
+    },
     "timeline.inspect": {
       "request": "#/$defs/request_timeline_inspect",
       "result": "#/$defs/result_timeline_inspect"
@@ -3371,6 +3375,9 @@
         },
         {
           "$ref": "#/$defs/request_asset_derive"
+        },
+        {
+          "$ref": "#/$defs/request_asset_envelope"
         }
       ]
     },
@@ -3937,6 +3944,98 @@
         "assetId",
         "kind",
         "ready"
+      ]
+    },
+    "params_asset_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assetId": {
+          "type": "string",
+          "pattern": "^as_[a-f0-9]{8}$"
+        }
+      },
+      "required": [
+        "projectId",
+        "assetId"
+      ]
+    },
+    "request_asset_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "asset.envelope"
+        },
+        "params": {
+          "$ref": "#/$defs/params_asset_envelope"
+        }
+      },
+      "required": [
+        "v",
+        "id",
+        "method",
+        "params"
+      ]
+    },
+    "result_asset_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "pattern": "^as_[a-f0-9]{8}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bucketSeconds": {
+          "type": "number",
+          "minimum": 0.016,
+          "maximum": 64
+        },
+        "peaks": {
+          "type": "array",
+          "maxItems": 4000,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "rms": {
+          "type": "array",
+          "maxItems": 4000,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "materialPeak": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "assetId",
+        "sha256",
+        "bucketSeconds",
+        "peaks",
+        "rms",
+        "materialPeak"
       ]
     },
     "params_timeline_inspect": {

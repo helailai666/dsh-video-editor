@@ -2,6 +2,15 @@
 
 更新：2026-11-11。
 
+## 分支中：整曲窗口对齐（asset.envelope + audioProfile assetId 模式）
+
+基于 main 5bbe304 建 `codex/range-window-alignment`（待 PR）。背景：用户实机确认 StepFun 等云模型无视逐秒提示词与时长请求，返回 3 分半整曲；旧契约 `sourceInFrame:0` 会把静默前奏垫进对白，AI 只能违规用 shell astats 手挑窗口。
+
+- 引擎（随插件捆绑，协议 0.9.0 原位扩展、不 bump 版本）：worker 新方法 `asset.envelope{projectId,assetId}`（`worker.mjs` case + `TimelineVisuals.envelopeOf`），复用 peaks-v1 缓存包络，返回整条素材约 1 秒桶的 peaks/rms/materialPeak；无音频素材 E_PARAMS；60s 解码截止。protocol.schema.json 增 params/request/result 与 oneOf 引用，worker README 补行；schema↔worker↔README 静态 parity 测试本机通过。
+- Host：`timeline.audioProfile` 支持 `assetId` 模式（与 fromFrame/toFrame 二选一，validate XOR），`assetAudioCurve` 折叠 >1200 桶并回 curve/rmsCurve/durationSeconds；Tool 描述与参数（assetId 白名单）同步两阶段+窗口选择。
+- 指令与 skill：sessions.js Range scoring 行压缩并加入"整曲→audioProfile(assetId)→按已确认表选窗口→sourceInFrame 对齐并如实报告偏移"；audio-creation 选区步骤扩为 10 步（第 7 步窗口选择）；配乐库新增"Reverse alignment"节（提示词写相对结构而非秒数，生成后按包络定位高潮/静默再对齐）。
+- 本机（Windows）验证：model-contract 全绿（新增 assetId 校验/互斥/行为桩、worker/schema/README parity 源断言；contextChars 6092、含自定义块 7957 仍在预算内）、check 58/0、smoke 86/0、audio provider、plugin-settings、stage-version 10/0。worker 集成测试 schema.test 的 doctor 响应项在纯 main 同样失败（Windows 平台边界，非本次引入）；asset.envelope 端到端与真实"整曲选窗上轨"待 POSIX/实机复测。
+
 ## 分支中：选区配乐两阶段流程（云模型强制 + 逐秒分析 + 确认门控）
 
 基于 main 238b3f0 建 `codex/range-score-cloud-model`（PR #7，追加提交中）：

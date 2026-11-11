@@ -24,10 +24,18 @@ assert(clientSource.includes("t('video.timeline.rangeRequest')"),'the sent range
 assert(text.includes('timeline.audioProfile'),'stage 1 must read the loudness curve');
 assert(text.includes('时间段（秒）'),'the user-facing table columns are fixed');
 assert(text.includes('END THE TURN'),'the prompt must wait for explicit approval before audio.generate');
+assert(text.includes('timeline.audioProfile(projectId,assetId)'),'the fixed line must teach whole-song window picking');
 const bridgeSourceForProfile=await readFile('host/bridge.js','utf8');
-assert(bridgeSourceForProfile.includes("'timeline.audioProfile': ['projectId','fromFrame','toFrame']"),'audioProfile needs an exact parameter whitelist');
+assert(bridgeSourceForProfile.includes("'timeline.audioProfile': ['projectId','fromFrame','toFrame','assetId']"),'audioProfile needs an exact parameter whitelist');
 const toolSourceForProfile=await readFile('host/tool.js','utf8');
-assert(toolSourceForProfile.includes("'timeline.audioProfile':['projectId','fromFrame','toFrame']"),'the Tool must expose audioProfile with the same fields');
+assert(toolSourceForProfile.includes("'timeline.audioProfile':['projectId','fromFrame','toFrame','assetId']"),'the Tool must expose audioProfile with the same fields');
+// The engine gained asset.envelope: worker case, schema parity and README entry must agree.
+const workerSource=await readFile('packages/video-engine-worker/src/worker.mjs','utf8');
+assert(workerSource.includes('case "asset.envelope"'),'the worker must dispatch asset.envelope');
+const schemaText=await readFile('packages/video-engine-worker/protocol.schema.json','utf8');
+assert(schemaText.includes('"asset.envelope"'),'the protocol schema must document asset.envelope');
+const workerReadme=await readFile('packages/video-engine-worker/README.md','utf8');
+assert(workerReadme.includes('`asset.envelope`'),'the worker README must list asset.envelope');
 assert(bridgeSourceForProfile.includes('music-scoring-library/SKILL.md'),'audio.guide must bundle the companion genre library');
 const librarySkill=await readFile('skills/music-scoring-library/SKILL.md','utf8');
 assert(librarySkill.includes('配乐库')&&librarySkill.includes('复仇、霸总、逆袭、打脸'),'the genre table ships with the plugin');
@@ -35,7 +43,9 @@ const creationSkill=await readFile('skills/audio-creation/SKILL.md','utf8');
 assert(creationSkill.includes('END THE TURN'),'the bundled skill keeps the confirmation gate');
 const profileConfig={projectIds:new Set(['demo'])};
 assert.deepEqual(validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120}),{projectId:'demo',fromFrame:0,toFrame:120});
+assert.deepEqual(validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',assetId:'as_500f1291'}),{projectId:'demo',assetId:'as_500f1291'});
 assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:5,toFrame:5}),(e)=>e.code==='E_PARAMS');
+assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120,assetId:'as_500f1291'}),(e)=>e.code==='E_PARAMS','assetId and a range are mutually exclusive');
 assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120,clipId:'cl_x'}),(e)=>e.code==='E_PARAMS');
 const profileBridge=Object.create(VideoBridge.prototype);
 profileBridge.rememberFacts=()=>{};profileBridge.closing=false;profileBridge.disposed=false;
@@ -58,6 +68,20 @@ assert.equal(profile.bucketSeconds,1);
 assert.deepEqual(profile.curve,[0.2,0.2,0.9,0.9],'window peaks fold onto whole seconds by max');
 assert.deepEqual(profile.sampledClips,['cl_a']);
 assert.equal(profile.unsampledClips,0);
+// assetId mode: whole-asset envelope for picking the insert window of a full song.
+const assetBridge=Object.create(VideoBridge.prototype);
+assetBridge.callClient=async(method,params)=>{
+  assert.equal(method,'asset.envelope');
+  return {assetId:params.assetId,sha256:'b'.repeat(64),bucketSeconds:1.024,
+    peaks:Array.from({length:210},(_,i)=>i<20?0.05:0.8),
+    rms:Array.from({length:210},()=>0.4),materialPeak:1};
+};
+const assetCurve=await assetBridge.audioProfile({projectId:'demo',assetId:'as_500f1291'});
+assert.equal(assetCurve.curve.length,210);
+assert.equal(assetCurve.curve[0],0.05);
+assert.equal(assetCurve.curve[30],0.8);
+assert(assetCurve.durationSeconds>210&&assetCurve.durationSeconds<220);
+assert.equal(assetCurve.materialPeak,1);
 assert(!text.includes('User additional instructions'),'no custom block without page settings');
 // A bound session with a custom prompt gets the block verbatim (max 2000).
 const longCustom='配乐保持器乐。'.repeat(300)+'OVERFLOW-SENTINEL'; // 1951 + sentinel > 2000
