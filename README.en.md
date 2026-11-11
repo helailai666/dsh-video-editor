@@ -68,11 +68,14 @@ Projects save automatically to `~/Movies/DSH Video` and use your DSH model confi
 
 ## Music settings (all in the page, no config files)
 
-- Open **Settings** in the chat header. Under **Music models** add, edit, remove, test, and pick the default model (built-in Qianwen plus your own compatible services, sync or async task protocol, with Base URL, remote model ID, and API key). Keys stay local, are never re-displayed, and no configuration file editing is ever required.
+- Open **Settings** in the chat header. Under **Music models** add, edit, remove, test, and pick the default model. Built-in protocols cover **Qianwen (sync / async task)**, **StepFun**, **Suno inspiration mode**, **Suno custom mode** and **MiniMax Music**; selecting one fills in the official Base URL and remote model ID, so usually you only paste an API key (override the Base URL for your own gateway). Keys stay local, are never re-displayed, and no configuration file editing is ever required.
+- StepFun, Suno and MiniMax decide the rendered length themselves; the plugin trims the result exactly to your selection and never loops or pads it.
 - Under **System prompt** append your extra instructions (for example scoring preferences); save or restore the default at any time. The fixed safety rules are never overridden.
-- Click **Range scoring** on the timeline, drag to select a range, then **Add to chat** (or copy the reference and type `@`, picking 当前时间范围) and describe the scene, e.g.:
+- Click **Range scoring** on the timeline, drag to select a range (or type exact seconds), write one line about this beat in the range bar and press **Send to chat**: the message carries the precise range reference into the conversation on the right, the AI writes the instrumental prompt, calls the music model you configured and scores exactly the selection. For example:
 
 > This beat is confrontational and driving — generate and add background music for the selected range.
+
+To phrase it yourself, press **Copy reference** or type `@` in the conversation and pick 当前时间范围.
 
 A successful score is trimmed exactly to the selection; a shorter asset stays in Materials with an honest note — never looped, never moving or overwriting other clips.
 

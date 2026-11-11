@@ -9,7 +9,21 @@ export const MAX_PLUGIN_SETTINGS_BYTES = 64 * 1024;
 export const MAX_CUSTOM_MUSIC_MODELS = 20;
 export const MAX_CUSTOM_SYSTEM_PROMPT = 2000;
 export const MUSIC_MODEL_ID = /^music_[a-f0-9]{16}$/;
-export const MUSIC_PROTOCOLS = Object.freeze(['qianwen-sync', 'qianwen-async']);
+export const MUSIC_PROTOCOLS = Object.freeze([
+  'qianwen-sync',
+  'qianwen-async',
+  'stepfun',
+  'suno-inspiration',
+  'suno-custom',
+  'minimax',
+]);
+/** Vendor protocols carry a documented default remote model when left blank. */
+export const MUSIC_PROTOCOL_DEFAULT_MODEL = Object.freeze({
+  stepfun: 'stepaudio-3-music-preview',
+  'suno-inspiration': 'suno-v6',
+  'suno-custom': 'suno-v6',
+  minimax: 'music-3.0',
+});
 
 function settingsError(code, message) {
   return new BridgeError(code, message, { stage: 'plugin-settings' });
@@ -112,7 +126,9 @@ export function normalizeMusicModel(value, { allowId = true } = {}) {
     throw settingsError('E_PARAMS', '音乐模型 ID 格式不正确');
   }
   const name = typeof value.name === 'string' ? value.name.trim() : '';
-  const remoteModel = typeof value.remoteModel === 'string' ? value.remoteModel.trim() : '';
+  const defaultModel = MUSIC_PROTOCOL_DEFAULT_MODEL[value.protocol];
+  const providedModel = typeof value.remoteModel === 'string' ? value.remoteModel.trim() : '';
+  const remoteModel = providedModel || defaultModel || '';
   if (
     !name || name.length > 80 || /[\0-\u001f\u007f]/.test(name) ||
     !remoteModel || remoteModel.length > 128 || /[\0-\u001f\u007f]/.test(remoteModel) ||

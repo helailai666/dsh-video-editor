@@ -33,6 +33,48 @@ const unboundFake={mappingSync:()=>null,bridge:{projectFacts:()=>null,customSyst
 assert.equal(SessionService.prototype.contextText.call(unboundFake,{agent:{session:{id:'other'}}}),'');
 const tool=createVideoTool({invoke:async()=>{throw new BridgeError('E_PARAMS','Invalid operationId');}});
 await assert.rejects(()=>tool.execute({action:'scene.compose',projectId:'demo',html:'x'},{agent:{id:'trusted'}}),e=>e.message.includes('expectedRevision')&&e.message.includes('operationId'));
-console.log(JSON.stringify({ok:true,contextChars:text.length,customChars:withCustom.length,checks:15}));
+// ── session.send: public admission, mapping authority and request-id replay ──
+const bridgeSource=await readFile('host/bridge.js','utf8');
+assert(/const SESSION_METHODS = Object.freeze\(\[[^\]]*'session\.send'/.test(bridgeSource),'session.send must sit inside the UI-only SESSION_METHODS gate');
+assert(bridgeSource.includes("'session.send': ['projectId', 'requestId', 'text']"),'session.send needs an exact parameter whitelist');
+assert(!(await readFile('host/tool.js','utf8')).includes("'session.send'"),'the model Tool must never expose session sending');
+function sendHost(project,controller){
+  return {
+    requireEnabled:()=>'ok',
+    requireActive:()=>true,
+    store:{project:async()=>project},
+    service:()=>controller,
+    dedupeKey:(projectId,requestId)=>projectId+'\u0000'+requestId,
+    sent:new Map(),
+    report(){},
+  };
+}
+const prompted=[];
+const promptController={prompt:async(request,signal)=>{prompted.push({request,aborted:signal===undefined});return{accepted:true};}};
+const sentOnce=await SessionService.prototype.send.call(sendHost({sessionIds:['s-old','s-active'],activeSessionId:'s-active'},promptController),'demo','send-1','`dshvideo:v1/demo/range/60-180/rev`\n对立、对抗节奏');
+assert.equal(sentOnce.accepted,true);
+assert.equal(prompted.length,1);
+assert.equal(prompted[0].request.sessionId,'s-active','the bound Session comes from the trusted mapping, never the Client');
+assert.equal(prompted[0].request.mode,'queue');
+assert.equal(prompted[0].request.requestId,'send-1');
+assert.equal(prompted[0].request.content[0].type,'text');
+assert(prompted[0].request.content[0].text.includes('dshvideo:v1/demo/range/60-180/rev'));
+// The same request id with the same content replays the acknowledgement only.
+const replayHost=sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},{prompt:async()=>{prompted.push({replay:true});return{accepted:true};}});
+await SessionService.prototype.send.call(replayHost,'demo','send-2','第一条');
+const beforeReplay=prompted.length;
+const replay=await SessionService.prototype.send.call(replayHost,'demo','send-2','第一条');
+assert.equal(replay.accepted,true);
+assert.equal(prompted.length,beforeReplay,'a replayed request id must never admit the message twice');
+await assert.rejects(()=>SessionService.prototype.send.call(replayHost,'demo','send-2','换了内容'),e=>e.code==='E_OPERATION_REUSED');
+// No bound Session, no prompt capability, and malformed input are all refused.
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:[],activeSessionId:null},promptController),'demo','send-3','x'),e=>e.code==='E_SESSION_NOT_BOUND');
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},{create:async()=>({})}),'demo','send-4','x'),e=>e.code==='E_SESSION_CONFIG');
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},promptController),'demo','bad id!!','x'),e=>e.code==='E_PARAMS');
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},promptController),'demo','send-5','   '),e=>e.code==='E_PARAMS');
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},promptController),'demo','send-6','x'.repeat(4001)),e=>e.code==='E_PARAMS');
+// A transport failure is reported as unconfirmed, never as a silent success.
+await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},{prompt:async()=>{throw new Error('socket closed');}}),'demo','send-7','x'),e=>e.code==='E_SESSION_SEND');
+console.log(JSON.stringify({ok:true,contextChars:text.length,customChars:withCustom.length,checks:27}));
 
 let plugin;vm.runInNewContext(await readFile('client.js','utf8'),{window:{__ModuleLoader__:{load(m){plugin=m.factory(()=>({createElement(){}}));}}},console,URL,TextEncoder,AbortController});assert(plugin.inject.includes('sessions'),'Client must await the Session service instead of caching an early null');

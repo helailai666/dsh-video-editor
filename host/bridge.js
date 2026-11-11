@@ -56,6 +56,7 @@ export const REQUEST_METHODS = Object.freeze([
   'session.list',
   'session.create',
   'session.select',
+  'session.send',
   'session.diagnose',
   'preview',
   'project.create',
@@ -122,6 +123,7 @@ const METHOD_PARAMS = Object.freeze({
   'session.list': ['projectId'],
   'session.create': ['projectId', 'requestId'],
   'session.select': ['projectId', 'sessionId'],
+  'session.send': ['projectId', 'requestId', 'text'],
   'session.diagnose': [],
   preview: ['projectId', 'sessionId', 'path'],
   'project.create': ['templateId', 'title', 'width', 'height', 'fps'],
@@ -150,7 +152,9 @@ const METHOD_PARAMS = Object.freeze({
   'ui.state.set': ['patch'],
 });
 
-const SESSION_METHODS = Object.freeze(['session.list', 'session.create', 'session.select', 'session.diagnose']);
+const SESSION_METHODS = Object.freeze(['session.list', 'session.create', 'session.select', 'session.send', 'session.diagnose']);
+/** Upper bound for one UI-composed chat message admitted through `session.send`. */
+const MAX_SESSION_SEND_CHARS = 4000;
 
 const REVISION = /^[a-f0-9]{64}$/;
 const JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -582,6 +586,20 @@ export function validateParams(config, method, params) {
     const sessionId = params.sessionId;
     if (typeof sessionId !== 'string' || SESSION_ID_PATTERN.test(sessionId) === false) fail('E_PARAMS', 'Invalid sessionId', 'params');
     return { projectId: allowedProject(config, params.projectId), sessionId };
+  }
+  if (method === 'session.send') {
+    // The UI composes one message for this project's bound Session; the Session id
+    // is never accepted from the Client, only resolved from the trusted mapping.
+    if (typeof params.requestId !== 'string' || REQUEST_ID.test(params.requestId) === false) {
+      fail('E_PARAMS', 'Invalid session requestId', 'params');
+    }
+    const body = text(params.text, 'text', MAX_SESSION_SEND_CHARS);
+    if (body.trim().length === 0 || body.includes('\r')) fail('E_PARAMS', 'Invalid session message', 'params');
+    return {
+      projectId: allowedProject(config, params.projectId),
+      requestId: params.requestId,
+      text: body,
+    };
   }
   if (method === 'project.create') {
     if (![TEMPLATE_ID, 'blank-v1'].includes(params.templateId)) fail('E_PARAMS', 'Unsupported project template', 'params');

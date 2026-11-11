@@ -170,13 +170,17 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeTitle': "配乐选区",
       'video.timeline.rangeLabel': "时间范围 {from}–{to}",
       'video.timeline.rangeDescription': "引用这个时间范围生成配乐",
-      'video.timeline.rangeReady': "选区已注册：在右侧对话输入 @ 选择「当前时间范围」，再描述剧情节奏。",
+      'video.timeline.rangeReady': "选区已就绪：在下方描述这段剧情的节奏，然后点「发送到聊天」。",
       'video.timeline.rangeFrom': "选区起点（秒）",
       'video.timeline.rangeTo': "选区终点（秒）",
       'video.timeline.rangeCopy': "复制引用",
-      'video.timeline.rangeCopied': "已复制选区引用。",
-      'video.timeline.rangeAdd': "添加到聊天",
-      'video.timeline.rangeAdded': "已复制选区引用：在右侧对话输入 @ 选择「当前时间范围」，或直接粘贴。",
+      'video.timeline.rangeCopied': "已复制选区引用，可直接粘贴到对话。",
+      'video.timeline.rangeNote': "剧情节奏描述",
+      'video.timeline.rangeSend': "发送到聊天",
+      'video.timeline.rangeSending': "发送中…",
+      'video.timeline.rangeSent': "已发送到对话：AI 会撰写器乐提示词，并按选区生成和添加配乐。",
+      'video.timeline.rangeSendFailed': "发送失败或状态未知：请先在对话中确认，再重试（同一请求不会重复插入）。",
+      'video.timeline.rangeNoteRequired': "请先描述这段剧情的节奏与情绪。",
       'video.timeline.rangeClear': "清除选区",
       'video.timeline.rangeInvalid': "请输入作品时长内的有效范围",
       'video.timeline.rangeCopyFailed': "复制失败，请手动选择引用文本",
@@ -199,6 +203,13 @@ window.__ModuleLoader__.load({
       'video.settings.protocol': "协议",
       'video.settings.protocolSync': "同步返回",
       'video.settings.protocolAsync': "异步任务",
+      'video.settings.protocolStepfun': "阶跃星辰 StepFun",
+      'video.settings.protocolSunoInspiration': "Suno 灵感模式",
+      'video.settings.protocolSunoCustom': "Suno 专业模式（风格标签）",
+      'video.settings.protocolMinimax': "MiniMax Music",
+      'video.settings.hintStepfun': "阶跃星辰：纯器乐，成片时长由模型决定（通常 1–3 分钟），无法精确指定；插件会按选区自动裁剪。",
+      'video.settings.hintSuno': "Suno：按次计费，每次通常返回 2 首，导入第一首完成的音频；提交后请勿连续重试。",
+      'video.settings.hintMinimax': "MiniMax：同步返回，单次可能等待数分钟；2026-08-20 起付费音乐接口不再向新账户开放。",
       'video.settings.remoteModel': "远端模型 ID",
       'video.settings.apiKey': "API Key",
       'video.settings.apiKeyKeep': "留空保留现有密钥",
@@ -490,13 +501,17 @@ window.__ModuleLoader__.load({
       'video.timeline.rangeTitle': "Scoring range",
       'video.timeline.rangeLabel': "Range {from}–{to}",
       'video.timeline.rangeDescription': "Use this range for background scoring",
-      'video.timeline.rangeReady': "Range registered: type @ in the chat on the right and pick 当前时间范围, then describe the scene.",
+      'video.timeline.rangeReady': "Range ready: describe this beat below, then press Send to chat.",
       'video.timeline.rangeFrom': "Range start (seconds)",
       'video.timeline.rangeTo': "Range end (seconds)",
       'video.timeline.rangeCopy': "Copy reference",
-      'video.timeline.rangeCopied': "Range reference copied.",
-      'video.timeline.rangeAdd': "Add to chat",
-      'video.timeline.rangeAdded': "Range reference copied: type @ in the chat on the right and pick 当前时间范围, or paste it directly.",
+      'video.timeline.rangeCopied': "Range reference copied; paste it into the conversation.",
+      'video.timeline.rangeNote': "Scene rhythm note",
+      'video.timeline.rangeSend': "Send to chat",
+      'video.timeline.rangeSending': "Sending…",
+      'video.timeline.rangeSent': "Sent to the conversation: the AI writes the instrumental prompt and scores the selection.",
+      'video.timeline.rangeSendFailed': "Send failed or unconfirmed: check the conversation first, then retry (the same request is never inserted twice).",
+      'video.timeline.rangeNoteRequired': "Describe the rhythm and mood of this beat first.",
       'video.timeline.rangeClear': "Clear range",
       'video.timeline.rangeInvalid': "Enter a valid range inside the project duration",
       'video.timeline.rangeCopyFailed': "Copy failed; select the reference text manually",
@@ -519,6 +534,13 @@ window.__ModuleLoader__.load({
       'video.settings.protocol': "Protocol",
       'video.settings.protocolSync': "Sync response",
       'video.settings.protocolAsync': "Async task",
+      'video.settings.protocolStepfun': "StepFun Step Audio",
+      'video.settings.protocolSunoInspiration': "Suno inspiration mode",
+      'video.settings.protocolSunoCustom': "Suno custom mode (style tags)",
+      'video.settings.protocolMinimax': "MiniMax Music",
+      'video.settings.hintStepfun': "StepFun: instrumental output whose length is decided by the model (typically 1-3 minutes); the plugin trims it to your selection.",
+      'video.settings.hintSuno': "Suno: billed per submit and usually returns 2 songs; the first finished one is imported. Never retry a submit blindly.",
+      'video.settings.hintMinimax': "MiniMax: synchronous response that can take minutes; since 2026-08-20 the paid music API is closed to new accounts.",
       'video.settings.remoteModel': "Remote model ID",
       'video.settings.apiKey': "API Key",
       'video.settings.apiKeyKeep': "Leave blank to keep the current key",
@@ -1814,33 +1836,36 @@ window.__ModuleLoader__.load({
 .dv-root .dv-reference-panel{top:64px;right:12px;left:auto;width:calc(100% - 24px);max-width:400px;max-height:calc(100% - 80px)}
 .dv-root .dv-settings-panel{max-width:460px}
 .dv-root .dv-settings-tabs{display:flex;gap:6px;flex-shrink:0}
-.dv-root .dv-settings-tabs button{flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--dsw-border-secondary,#d8d8d8);background:transparent;color:inherit;font-size:12px;cursor:pointer}
-.dv-root .dv-settings-tabs button.is-active{border-color:var(--dsw-alias-brand-primary,#82c8cf);font-weight:600}
+.dv-root .dv-settings-tabs button{flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--dv-panel-line);background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.dv-root .dv-settings-tabs button.is-active{border-color:var(--dsw-alias-brand-primary,#82c8cf);font-weight:600;background:color-mix(in srgb,var(--dv-panel-ink) 6%,transparent)}
 .dv-root .dv-settings-body{display:flex;flex-direction:column;gap:8px;min-height:0}
 .dv-root .dv-settings-help,.dv-root .dv-settings-fixed{margin:0;font-size:11.5px;opacity:.8;line-height:1.5}
-.dv-root .dv-settings-fixed{padding:6px 8px;border-radius:8px;background:var(--dsw-fill-quaternary,#f2f2f2)}
+.dv-root .dv-settings-fixed{padding:6px 8px;border-radius:8px;background:color-mix(in srgb,var(--dv-panel-ink) 6%,transparent)}
 .dv-root .dv-settings-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;overflow:auto;min-height:0}
-.dv-root .dv-settings-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--dsw-border-secondary,#e0e0e0);border-radius:9px}
+.dv-root .dv-settings-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--dv-panel-line);border-radius:9px;background:color-mix(in srgb,var(--dv-panel-ink) 4%,transparent)}
 .dv-root .dv-settings-list li[data-default="true"]{border-color:var(--dsw-alias-brand-primary,#82c8cf)}
 .dv-root .dv-settings-item-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dv-root .dv-settings-item-main strong{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dv-root .dv-settings-item-main small{font-size:11px;opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dv-root .dv-settings-item-main .dv-settings-url{font-family:ui-monospace,Consolas,monospace}
-.dv-root .dv-settings-badge{font-style:normal;font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-fill-tertiary,#eee);width:max-content}
+.dv-root .dv-settings-badge{font-style:normal;font-size:10px;padding:1px 6px;border-radius:999px;background:color-mix(in srgb,var(--dv-panel-ink) 12%,transparent);color:inherit;width:max-content}
 .dv-root .dv-settings-item-actions{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 .dv-root .dv-settings-item-actions .dv-button{font-size:11px;padding:3px 7px}
-.dv-root .dv-settings-form{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--dsw-border-secondary,#e0e0e0);border-radius:10px;flex-shrink:0}
+.dv-root .dv-settings-form{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--dv-panel-line);border-radius:10px;flex-shrink:0;background:color-mix(in srgb,var(--dv-panel-ink) 4%,transparent)}
 .dv-root .dv-settings-form label{display:flex;align-items:center;gap:6px;font-size:11.5px}
-.dv-root .dv-settings-form input,.dv-root .dv-settings-form select{flex:1;min-width:0;font-size:12px;padding:4px 7px;border-radius:7px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit}
+.dv-root .dv-settings-form input,.dv-root .dv-settings-form select{box-sizing:border-box;flex:1;min-width:0;font-size:12px;padding:4px 7px;border-radius:7px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit}
+.dv-root .dv-settings-form select option{background:var(--dsw-alias-bg-base,#1a1a1c);color:inherit}
 .dv-root .dv-settings-form-actions{display:flex;align-items:center;gap:6px;justify-content:flex-end}
 .dv-root .dv-settings-count{margin-right:auto;font-size:11px;opacity:.7}
-.dv-root .dv-settings-prompt{width:100%;box-sizing:border-box;font-size:12px;line-height:1.5;padding:7px 9px;border-radius:9px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit;resize:vertical;font-family:inherit}
+.dv-root .dv-settings-prompt{box-sizing:border-box;width:100%;font-size:12px;line-height:1.5;padding:7px 9px;border-radius:9px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit;resize:vertical;font-family:inherit}
 .dv-root .dv-settings-add{align-self:flex-start}
 .dv-root .dv-settings-notice{margin:0;min-height:16px;font-size:11.5px;color:var(--dsw-alias-brand-primary,#3f9a95)}
-.dv-root .dv-range-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--dsw-border-secondary,#e4e4e4);font-size:12px;flex-shrink:0}
+.dv-root .dv-range-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--dv-panel-line);font-size:12px;flex-shrink:0}
 .dv-root .dv-range-bar strong{font-size:12px}
 .dv-root .dv-range-label{opacity:.8;font-size:11.5px}
-.dv-root .dv-range-bar input[type="number"]{width:74px;font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--dsw-border-secondary,#d5d5d5);background:var(--dsw-bg-container,#fff);color:inherit}
+.dv-root .dv-range-bar input[type="number"]{box-sizing:border-box;width:74px;font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit}
+.dv-root .dv-range-bar .dv-range-note{flex:1 1 160px;min-width:140px;font-size:12px;padding:3px 7px;border-radius:7px;border:1px solid var(--dv-panel-line);background:color-mix(in srgb,var(--dv-panel-ink) 3%,var(--dsw-alias-bg-base,#1a1a1c));color:inherit}
+.dv-root .dv-range-bar .dv-range-note::placeholder{color:color-mix(in srgb,var(--dv-panel-ink) 55%,transparent)}
 .dv-root .dv-range-bar .dv-button{font-size:11px;padding:3px 8px}
 .dv-root .dv-timeline-range{position:absolute;top:26px;bottom:0;z-index:6;pointer-events:none;background:color-mix(in srgb,var(--dsw-alias-brand-primary,#82c8cf) 18%,transparent);border-left:2px solid var(--dsw-alias-brand-primary,#5fb7b0);border-right:2px solid var(--dsw-alias-brand-primary,#5fb7b0)}
 .dv-root .dv-timeline-range[data-draft="true"]{opacity:.75}
@@ -1848,7 +1873,7 @@ window.__ModuleLoader__.load({
 .dv-root .dv-timeline[data-range-mode="true"] .dv-playhead-handle{pointer-events:none}
 .dv-root .dv-settings-toggle svg{opacity:.85}
 .dv-root .dv-range-tool[aria-pressed="true"]{color:var(--dsw-alias-brand-primary,#3f9a95);border-color:var(--dsw-alias-brand-primary,#82c8cf)}
-.dv-root .dv-button-danger{color:#b3261e;border-color:#e2a9a4}
+.dv-root .dv-button-danger{color:#e57373;border-color:color-mix(in srgb,#e57373 45%,transparent)}
 .dv-root .dv-drawer.dv-media-library{top:52px;left:12px;width:min(352px,calc(100% - 24px));max-height:min(580px,calc(100% - 68px))}
 .dv-root .dv-reference-toggle{margin:0;align-self:auto;width:auto;display:inline-flex;gap:5px;padding:0 8px;font-size:12px}
 .dv-root .dv-reference-head,.dv-root .dv-drawer-head{display:flex;align-items:center;gap:8px;font-size:13px;min-height:28px;flex-shrink:0}
@@ -4388,7 +4413,27 @@ window.__ModuleLoader__.load({
         const r = await call('audio.configure', { apiKey: keyInput });
         if (r) { setSettings(r); setKeyOpen(false); setKeyInput(''); setNotice(t('video.settings.saved')); }
       }
-      const protocolLabel = p => p === 'qianwen-async' ? t('video.settings.protocolAsync') : t('video.settings.protocolSync');
+      const PROTOCOL_OPTIONS = [
+        ['qianwen-sync', t('video.settings.protocolSync'), '', '', ''],
+        ['qianwen-async', t('video.settings.protocolAsync'), '', '', ''],
+        ['stepfun', t('video.settings.protocolStepfun'), 'https://api.stepfun.com', 'stepaudio-3-music-preview', 'video.settings.hintStepfun'],
+        ['suno-inspiration', t('video.settings.protocolSunoInspiration'), 'https://www.suno-api.io', 'suno-v6', 'video.settings.hintSuno'],
+        ['suno-custom', t('video.settings.protocolSunoCustom'), 'https://www.suno-api.io', 'suno-v6', 'video.settings.hintSuno'],
+        ['minimax', t('video.settings.protocolMinimax'), 'https://api.minimax.cn', 'music-3.0', 'video.settings.hintMinimax'],
+      ];
+      const protocolInfo = p => PROTOCOL_OPTIONS.find(x => x[0] === p) || PROTOCOL_OPTIONS[0];
+      const protocolLabel = p => protocolInfo(p)[1];
+      const switchProtocol = next => {
+        const [, , base, model] = protocolInfo(next);
+        const previousBase = protocolInfo(draft.protocol)[2];
+        const previousModel = protocolInfo(draft.protocol)[3];
+        setDraft({
+          ...draft,
+          protocol: next,
+          baseUrl: !draft.baseUrl || draft.baseUrl === previousBase ? base : draft.baseUrl,
+          remoteModel: !draft.remoteModel || draft.remoteModel === previousModel ? model : draft.remoteModel,
+        });
+      };
       return h('section', {
         className: 'dv-reference-panel dv-settings-panel', ref: panelRef, role: 'dialog', 'aria-label': t('video.settings.title'), tabIndex: -1,
         onKeyDown: e => { if (e.key === 'Escape') props.onClose(); },
@@ -4434,12 +4479,12 @@ window.__ModuleLoader__.load({
           ) : null,
           draft ? h('div', { className: 'dv-settings-form', role: 'group', 'aria-label': draft.id ? t('video.settings.edit') : t('video.settings.add') },
             h('label', null, t('video.settings.name'), h('input', { ref: firstField, value: draft.name, maxLength: 80, onChange: e => setDraft({ ...draft, name: e.target.value }) })),
-            h('label', null, t('video.settings.protocol'), h('select', { value: draft.protocol, onChange: e => setDraft({ ...draft, protocol: e.target.value }) },
-              h('option', { value: 'qianwen-sync' }, t('video.settings.protocolSync')),
-              h('option', { value: 'qianwen-async' }, t('video.settings.protocolAsync')),
+            h('label', null, t('video.settings.protocol'), h('select', { value: draft.protocol, onChange: e => switchProtocol(e.target.value) },
+              PROTOCOL_OPTIONS.map(([value, label]) => h('option', { key: value, value }, label)),
             )),
-            h('label', null, 'Base URL', h('input', { value: draft.baseUrl, maxLength: 2048, placeholder: 'https://service.example.com', onChange: e => setDraft({ ...draft, baseUrl: e.target.value }) })),
-            h('label', null, t('video.settings.remoteModel'), h('input', { value: draft.remoteModel, maxLength: 128, onChange: e => setDraft({ ...draft, remoteModel: e.target.value }) })),
+            protocolInfo(draft.protocol)[4] ? h('p', { className: 'dv-settings-help' }, t(protocolInfo(draft.protocol)[4])) : null,
+            h('label', null, 'Base URL', h('input', { value: draft.baseUrl, maxLength: 2048, placeholder: protocolInfo(draft.protocol)[2] || 'https://service.example.com', onChange: e => setDraft({ ...draft, baseUrl: e.target.value }) })),
+            h('label', null, t('video.settings.remoteModel'), h('input', { value: draft.remoteModel, maxLength: 128, placeholder: protocolInfo(draft.protocol)[3] || t('video.settings.remoteModel'), onChange: e => setDraft({ ...draft, remoteModel: e.target.value }) })),
             h('label', null, 'API Key', h('input', { type: 'password', autoComplete: 'new-password', value: draft.apiKey, maxLength: 512, placeholder: t('video.settings.apiKeyKeep'), onChange: e => setDraft({ ...draft, apiKey: e.target.value }) })),
             h('div', { className: 'dv-settings-form-actions' },
               h('button', { className: 'dv-button', disabled: busy || !draft.name || !draft.baseUrl || !draft.remoteModel, onClick: () => void saveModel() }, t('video.settings.save')),
@@ -4510,7 +4555,11 @@ window.__ModuleLoader__.load({
         [range,setRange]=React.useState(null),
         [rangeDraft,setRangeDraft]=React.useState(null),
         [rangeFrom,setRangeFrom]=React.useState(''),
-        [rangeTo,setRangeTo]=React.useState('');
+        [rangeTo,setRangeTo]=React.useState(''),
+        [rangeNote,setRangeNote]=React.useState(''),
+        [sending,setSending]=React.useState(false);
+      /** Last send attempt so a lost acknowledgement replays the same request id. */
+      const rangeSendRef=React.useRef(null);
       const [recovery,setRecovery]=React.useState(null);
       const [selectedTrack,setSelectedTrack]=React.useState(null),[removeTrack,setRemoveTrack]=React.useState(null),[trackContext,setTrackContext]=React.useState(null),[clipContext,setClipContext]=React.useState(null);
       const gutter=156;
@@ -4792,11 +4841,43 @@ window.__ModuleLoader__.load({
         if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<=a||b>duration){setNotice(t('video.timeline.rangeInvalid'));return;}
         commitRange({fromFrame:a,toFrame:b});
       }
-      function clearRange() {setRange(null);setRangeFrom('');setRangeTo('');setActiveRangeCandidate(null);}
-      async function copyRangeReference(mode) {
+      function clearRange() {setRange(null);setRangeFrom('');setRangeTo('');setRangeNote('');setActiveRangeCandidate(null);rangeSendRef.current=null;}
+      async function copyRangeReference() {
         if(!range)return;
         const ok=await copyTextLocally(referenceText(range.token));
-        setNotice(t(ok?mode==='add'?'video.timeline.rangeAdded':'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
+        setNotice(t(ok?'video.timeline.rangeCopied':'video.timeline.rangeCopyFailed'));
+      }
+      /** One chat message: the exact range reference plus the user's scene note. */
+      function rangeMessage() {
+        if(!range)return null;
+        const note=String(rangeNote||'').replace(/[\r\n]+/g,' ').trim();
+        if(!note)return null;
+        return referenceText(range.token)+'\n'+note;
+      }
+      /**
+       * Admit the message through the Host's public session prompt path. A lost
+       * acknowledgement replays the same request id instead of sending twice, so a
+       * retry can never put the same scoring request in the conversation twice.
+       */
+      async function sendRangeToChat() {
+        const message=rangeMessage();
+        if(!message){setNotice(t('video.timeline.rangeNoteRequired'));return;}
+        if(sending)return;
+        const key=props.projectId+'\n'+message;
+        const previous=rangeSendRef.current;
+        const requestId=previous&&previous.key===key
+          ? previous.requestId
+          : 'dsh-range-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+        rangeSendRef.current={key,requestId};
+        setSending(true);
+        try {
+          const r=await hostRequest('session.send',{projectId:props.projectId,requestId,text:message});
+          setNotice(t(r&&r.accepted===true?'video.timeline.rangeSent':'video.timeline.rangeSendFailed'));
+        } catch (_error) {
+          setNotice(t('video.timeline.rangeSendFailed'));
+        } finally {
+          if(alive.current)setSending(false);
+        }
       }
       function seekAtLane(clientX,lane){
         if(!lane)return;
@@ -5009,8 +5090,9 @@ window.__ModuleLoader__.load({
           h('input',{type:'number',min:0,max:duration/30,step:0.1,value:rangeTo,'aria-label':t('video.timeline.rangeTo'),onChange:e=>setRangeTo(e.target.value),onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();applyRangeInputs();}}}),
           h('span',null,'s'),
           h('button',{className:'dv-button dv-button-quiet',onClick:applyRangeInputs},t('video.reference.range')),
-          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('add')},t('video.timeline.rangeAdd')),
-          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference('copy')},t('video.timeline.rangeCopy')),
+          h('input',{className:'dv-range-note',type:'text',maxLength:600,value:rangeNote,placeholder:t('video.timeline.rangeNote'),'aria-label':t('video.timeline.rangeNote'),onChange:e=>{setRangeNote(e.target.value);rangeSendRef.current=null;},onKeyDown:e=>{if(e.key==='Enter'){e.preventDefault();void sendRangeToChat();}}}),
+          h('button',{className:'dv-button',disabled:sending||!rangeNote.trim(),onClick:()=>void sendRangeToChat()},t(sending?'video.timeline.rangeSending':'video.timeline.rangeSend')),
+          h('button',{className:'dv-button dv-button-quiet',onClick:()=>void copyRangeReference()},t('video.timeline.rangeCopy')),
           h('button',{className:'dv-button dv-button-quiet',onClick:clearRange},t('video.timeline.rangeClear')),
         ):null,
         removeTrack?h(TrackDeleteConfirmation,{t,busy,name:data.tracks.find(tr=>tr.trackId===removeTrack.trackId)?.name||'',onCancel:()=>setRemoveTrack(null),onConfirm:()=>{const target=removeTrack;setRemoveTrack(null);if(target.revision!==data.revision){setNotice(t('video.canvas.revisionRefreshed'));return;}void write([{op:'track.remove',trackId:target.trackId,force:true}]);}}):null,

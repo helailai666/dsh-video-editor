@@ -177,8 +177,10 @@ export async function resolveExecutable(command, env) {
 export function fakeSessionController(prefix) {
   let counter = 0;
   const created = [];
+  const prompted = [];
   return {
     created,
+    prompted,
     async create() {
       counter += 1;
       const sessionId = 'session-conv-' + (prefix || 'run') + '-' + counter;
@@ -190,6 +192,15 @@ export function fakeSessionController(prefix) {
     },
     async inspect(sessionId) {
       return { meta: { id: sessionId }, events: [] };
+    },
+    // Public DSH admission path used by `session.send`; queue mode only.
+    async prompt(request) {
+      if (request.mode !== 'queue') throw new Error('fake: unsupported prompt mode');
+      if (Array.isArray(request.content) === false || request.content.some((part) => part.type !== 'text')) {
+        throw new Error('fake: unsupported prompt content');
+      }
+      prompted.push(request);
+      return { accepted: true };
     },
   };
 }
