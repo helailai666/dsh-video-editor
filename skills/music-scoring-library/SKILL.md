@@ -33,14 +33,15 @@ For every segment of the 精确时间轴表 (时间段（秒）/情绪状态/强
 
 ## Condense the cloud prompt
 
-The billed `audio.generate` text is ONE short paragraph (<=2000 chars, instrumental unless the user asked for vocals):
+The billed `audio.generate` text is ONE compact block (<=2000 chars, instrumental unless the user asked for vocals), always in this order:
 
 1. one style sentence from the row (核心情绪 + genre),
-2. 3-6 concrete instruments/timbres from the row,
-3. the BPM (or 文戏慢/打斗快 phrasing for dual-tempo rows),
-4. the dynamic arc and hit-point plan in one clause.
+2. key, BPM, meter, pure instrumental,
+3. 3-6 concrete instruments/timbres from the row,
+4. **a beat-point structure line (卡点结构线)** — every hit of the confirmed table written as `<position in the cue> <musical action>（对准 <video event>）`. Positions are percentages or section words of the cue length (起手/15%/中段/70%/收尾) — models respect relative placement; absolute clock seconds are forbidden because the model ignores them. Each hit-point must name the concrete video event from the table's 卡点·转场 column (哪句台词重音/哪个动作起手/哪次反转), and the line ends with the exit rule matching the transition to the next cue (骤然收住 vs 衰减). Example: `起手 0-10% 极静单音弦乐（对准对白开始）→ 30% 心跳低鼓进入（对准她抽回手）→ 50% 半拍全体休止后不协和齐奏砸下（对准台词反转）→ 80% 噪音上扬撕裂（对准开门瞬间）→ 收尾 2 拍内骤停归零（硬切下一段）`.
+5. one dynamics/headroom clause (ppp/fff contrast, bed level under speech).
 
-If the configured model responds better to English, translate faithfully: 失真贝斯→distorted bass, 铜管→brass stabs, 古筝→guzheng (Chinese zither), 二胡→erhu, 编钟→bianzhong chimes, 大鼓→taiko-style war drum, 木琴→xylophone, 空灵人声吟唱→ethereal wordless vocals. Keep cultural instruments named; do not replace them with generic "orchestral".
+If the configured model responds better to English, translate faithfully: 失真贝斯→distorted bass, 铜管→brass stabs, 古筝→guzheng (Chinese zither), 二胡→erhu, 编钟→bianzhong chimes, 大鼓→taiko-style war drum, 木琴→xylophone, 空灵人声吟唱→ethereal wordless vocals. Keep cultural instruments named; do not replace them with generic "orchestral". A translated prompt keeps the same 卡点结构线 shape: `at 50% a sudden half-beat silence then a dissonant string slam (hits the dialogue reversal)`.
 
 ## Reverse alignment (why the song never matches the clock)
 
