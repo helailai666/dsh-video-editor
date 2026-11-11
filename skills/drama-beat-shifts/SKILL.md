@@ -77,7 +77,7 @@ AI短剧不是"一段平静一段爆发"，而是**高频切换**：
 
 - **每个稳态/爆发段 = 一条独立 cue**：一次 `audio.generate` 生成一段（稳态段与爆发段风格差异大时分别生成），用 `clip.insert` 按帧相邻上轨（`startFrame` 精确到钩子帧），硬切=两段直接相邻且各自 `fade` 极短（入 0~3 帧、出 0~6 帧）；"全体休止"用两段之间 8~15 帧的空隙（不铺音乐）表达。一条整曲只服务**单一稳态或单一爆发**的弧线，不要指望单曲内部完成转换。
 - **模板→六列表格映射**（range scoring 的确认表沿用这些列）：情绪状态=稳态/爆发+核心情绪词；强度(1-10)=稳态 1~3、爆发 8~10，禁止 4~7 的中间态平铺；配器与音色=从第 4 节转化库按段取"稳态"或"爆发第一拍"栏；动态与音量=ppp/fff 极差（爆发段落位电平可比稳态高 10~14 dB，但对白下仍按混音规则压）；卡点·转场=硬切方式+帧对齐说明（对应台词/动作/反转）。
-- **计费提示词写法**：稳态段——"sparse, single instrument, pp, static, no development"；爆发段——"starts at maximum intensity on beat one, zero crescendo, fff, [三项极限手段：如 dissonant cluster + distorted bass blast + white-noise crash], relentless, no lyrical回落"。相对结构词照第 4/5 节，秒数承诺一律不写（见配乐库 Reverse alignment）。
+- **计费提示词写法**：稳态段——"sparse, single instrument, pp, static, no development"；爆发段——"starts at maximum intensity on beat one, zero crescendo, fff, [三项极限手段：如 dissonant cluster + distorted bass blast + white-noise crash], relentless, no lyrical回落"。每条 cue 都必须带**卡点结构线**（见配乐库 Condense 节）：`<该 cue 长度的百分比位置> <音乐动作>（对准 <画面事件>）`，位置只用百分比/段落词，禁止绝对秒数，但"哪个卡点对准哪句台词重音、哪个动作起手、哪次反转"必须逐个写明，收尾方式（骤停归零 vs 衰减）与到下一段的硬切方式一致。秒数承诺一律不写（见配乐库 Reverse alignment）。
 - **多 cue 计费**：N 段=N 次云调用；阶段一确认表必须写清"共几条 cue、各多长、总计费几次"，用户确认的是整组方案；同模型同会话逐条 generate，逐条按包络选窗，逐条上轨。
 - **本地合成兜底更"可控"**：若用户要免费方案，稳态/爆发可用 provider procedural 精确按帧写（单音重复→音簇齐砸+休止），硬切能力反而强于云模型；在方案里如实对比后由用户选。
 - **钩子音效**（叮/重击/下潜/心跳）优先做成独立短 cue 或 procedural sfx，与对应爆发段同帧 `clip.insert`，不与音乐段混写。
