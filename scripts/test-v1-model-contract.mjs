@@ -36,6 +36,15 @@ const schemaText=await readFile('packages/video-engine-worker/protocol.schema.js
 assert(schemaText.includes('"asset.envelope"'),'the protocol schema must document asset.envelope');
 const workerReadme=await readFile('packages/video-engine-worker/README.md','utf8');
 assert(workerReadme.includes('`asset.envelope`'),'the worker README must list asset.envelope');
+// ── Render deadline: one budget shared by the worker, the topbar and the canvas ──
+const jobsSource=await readFile('packages/video-engine-worker/src/jobs.mjs','utf8');
+assert(jobsSource.includes('RENDER_MS_PER_FRAME = 240')&&clientSource.includes('RENDER_MS_PER_FRAME = 240'),'the render capture deadline must stay identical in the worker and the client');
+assert(jobsSource.includes('VALIDATE_MS_PER_FRAME = 25'),'the count_frames validation probe needs a budget that scales with the frame count');
+assert(jobsSource.includes('timeoutMs: 15000')===false||jobsSource.includes('validateProbeTimeoutMs(frames)'),'the full-frame probe must not keep the fixed 15s window');
+assert(clientSource.includes('EXPORT_POST_CAPTURE_SLACK_MS'),'the UI poll must outlast the worker deadline plus the post-capture slack');
+assert(clientSource.includes('attempt < 240')===false,'the canvas export must not keep a fixed 120s poll window');
+const configSource=await readFile('host/config.js','utf8');
+assert(configSource.includes('192 * 1024 * 1024'),'a long 1080x1920 export must not hit the artifact ceiling');
 assert(bridgeSourceForProfile.includes('music-scoring-library/SKILL.md'),'audio.guide must bundle the companion genre library');
 assert(bridgeSourceForProfile.includes('drama-beat-shifts/SKILL.md'),'audio.guide must bundle the beat-shift designer');
 const beatShiftSkill=await readFile('skills/drama-beat-shifts/SKILL.md','utf8');

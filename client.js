@@ -2268,12 +2268,27 @@ window.__ModuleLoader__.load({
     const PREVIEW_RETRY_DELAY_MS = 400;
     const PREVIEW_DIAGNOSTIC_LIMIT = 6;
     // P3-017 B3 product export. The render deadline is measured by the worker
-    // (a real composition needs minutes); the UI poll simply follows the job
-    // until it settles. The client deadline is a safety net slightly above the
-    // Host maximum, never a substitute for the worker's own timeout.
-    const PRODUCT_RENDER_TIMEOUT_MS = 900000;
-    const PRODUCT_EXPORT_DEADLINE_MS = 16 * 60 * 1000;
+    // (a real composition needs minutes, and a long vertical film needs the
+    // post-capture loudness pass plus a full-frame decode validation); the UI
+    // poll simply follows the job until it settles. Both the topbar and the
+    // canvas export share this one budget so neither gives up before the
+    // worker's own deadline. The formula mirrors `renderTimeoutMs` in
+    // packages/video-engine-worker/src/jobs.mjs.
+    const RENDER_BASE_MS = 120000;
+    const RENDER_MS_PER_FRAME = 240;
+    const RENDER_MIN_MS = 300000;
+    const MAX_RENDER_TIMEOUT_MS = 21600000;
+    const EXPORT_POST_CAPTURE_SLACK_MS = 300000;
     const PRODUCT_EXPORT_POLL_MS = 500;
+
+    function renderBudgetMs(durationSeconds) {
+      const seconds = Number(durationSeconds);
+      const frames = Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 30) : 1;
+      return Math.min(
+        MAX_RENDER_TIMEOUT_MS,
+        Math.max(RENDER_MIN_MS, RENDER_BASE_MS + RENDER_MS_PER_FRAME * frames),
+      );
+    }
     // The plugin-private source key for its owned Session references. It must
     // never reuse "mainView": the host derives its current conversation from
     // that retention key (see P3-005-A investigation).
@@ -6562,17 +6577,36 @@ window.__ModuleLoader__.load({
         setActionError(null);
         setExportState({ state: 'running' });
         try {
-          const job = await hostRequest('render', { projectId: projectId, revision: revision });
+          // The worker bounds the render; the UI follows it with the same budget
+          // plus the post-capture slack, because a long film still needs the
+          // loudness pass and the full-frame validation after capture reaches 1.
+          const budgetMs = renderBudgetMs(displayDuration);
+          const job = await hostRequest('render', { projectId: projectId, revision: revision, timeoutMs: budgetMs });
           const jobId = job.jobId;
           let result = job;
-          for (let attempt = 0; attempt < 240; attempt += 1) {
+          const deadline = Date.now() + budgetMs + EXPORT_POST_CAPTURE_SLACK_MS;
+          while (isTerminalJob(result) === false && Date.now() < deadline) {
             await new Promise(function wait(resolve) {
-              setTimeout(resolve, 500);
+              setTimeout(resolve, PRODUCT_EXPORT_POLL_MS);
             });
             result = await hostRequest('status', { jobId: jobId });
-            if (['succeeded', 'failed', 'cancelled', 'timed_out'].includes(result.state)) break;
           }
-          if (result.state !== 'succeeded') throw { code: 'E_RENDER', message: t('video.canvas.exportFailed') };
+          if (isTerminalJob(result) === false) {
+            // A client-side safety net must stop the job instead of leaving a
+            // render running with no owner.
+            try {
+              await hostRequest('cancel', { jobId: jobId });
+            } catch (_cancelError) {
+              /* best effort; the worker deadline still bounds the job */
+            }
+            throw { code: 'E_TIMEOUT', message: t('video.canvas.exportFailed') };
+          }
+          if (result.state !== 'succeeded') {
+            throw {
+              code: (result.error && result.error.code) || 'E_RENDER',
+              message: t('video.canvas.exportFailed'),
+            };
+          }
           setExportState({ state: 'ready', jobId: jobId, url: 'api/dsh-video/artifact?jobId=' + encodeURIComponent(jobId) });
         } catch (error) {
           setExportState({ state: 'error' });
@@ -7906,7 +7940,7 @@ window.__ModuleLoader__.load({
           job = await hostRequest('render', {
             projectId: projectIdRef.current,
             revision: revisionAtClick,
-            timeoutMs: Math.min(21600000,Math.max(PRODUCT_RENDER_TIMEOUT_MS,60000+140*Math.round((project?.duration||0)*30))),
+            timeoutMs: renderBudgetMs(project?.duration || 0),
           });
         } catch (error) {
           settleFailure(error !== null && typeof error === 'object' && typeof error.code === 'string' ? error.code : 'E_RENDER');
@@ -7926,7 +7960,7 @@ window.__ModuleLoader__.load({
             progress: Number.isFinite(job.progress) ? job.progress : 0,
           });
         });
-        const deadline = startedAt + Math.max(PRODUCT_EXPORT_DEADLINE_MS,120000+140*Math.round((project?.duration||0)*30));
+        const deadline = startedAt + renderBudgetMs(project?.duration || 0) + EXPORT_POST_CAPTURE_SLACK_MS;
         let result = job;
         let consecutiveStatusErrors = 0;
         while (isTerminalJob(result) === false && Date.now() < deadline) {
