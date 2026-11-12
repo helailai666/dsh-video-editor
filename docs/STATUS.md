@@ -2,7 +2,9 @@
 
 更新：2026-11-11。
 
-## 开发中：卡点改为可测量（timeline.beatmap + asset.align + 免费本地卡点层）
+下面两节已合入 main（PR #11、#12）。本轮**未做版本 bump**（main 上 `package.json` 仍为 1.0.3）、**未创建 tag**、npm/GitHub Release 状态不变；两项都只有本机（Windows）语法/契约/纯单测证据，真实长片导出与真实云端配乐闭环尚未在 macOS 复跑。实机通过后，1.0.4 的 bump 与 tag 按当次授权再做。
+
+## 已合入 main（PR #12）：卡点改为可测量（timeline.beatmap + asset.align + 免费本地卡点层）
 
 用户实机反馈：1.0.3 之后云端配乐"风格对，但没踩在剧情卡点上"。原因是整条链路里没有任何节拍测量代码——卡点位置、生成后"命中/漂移几秒"全靠模型读逐秒数组目测，而 StepFun/Suno/MiniMax 连时长字段都不接受，"50% 处的重击"落地秒数天然漂移。本次把节奏变成引擎算出来的事实。
 
@@ -11,10 +13,10 @@
 - Host：`bridge.js` 新增 `timeline.beatmap`/`asset.align` 白名单、参数校验（整数帧、≤10800 跨度、`as_[a-f0-9]{8}`、hitFrames ≤256 严格递增且落在区间内、tempoLock 布尔）与门面（先 `timeline.inspect` 取权威 revision 再转发；`asset.align` 结果附一行可直接执行的 `note`：insert 参数、`clip.speed`、卡点层走 `kind sfx provider procedural`）；`tool.js` 暴露两个动作并改写两阶段契约描述——阶段一必须用 beatmap 的真实帧/pct 绑定卡点，阶段二生成后必须 `asset.align` 并按 `best` 上轨、如实报告 hitRate 与漂移帧数。
 - 第四份 skill `skills/beat-alignment/SKILL.md`（`audio.guide` 现拼接四份，`package.json`/`stage-dev.mjs` 已收录）：卡点必须来自测量、结构线写成 `<pct%> <音乐动作>（对准 <画面事件> @<frame>帧）` 并把 `grid.bpm` 写进提示词、生成后必须量一次、漂移时叠免费卡点层（并发为 1，须在云歌终态后发起）、多 cue 逐条走 beatmap→generate→align、自检清单与诚实边界（检不到拍时 `grid.bpm:null`，退回 cut 网格并如实说明，不得声称已锁拍）。audio-creation 第 2/3/7 步与配乐库的选窗段同步改为引用这两个方法，不再要求模型目测数组自评。
 - 固定指令按预算做了净零改写（新增 beatmap/asset.align 要求同时压缩原句）：`contextChars 6109`（<6500）、含 2000 字符自定义块 `customChars 7974`（≤8000），关键门控短语全部保留。
-- 本机（Windows）验证：`test/beat.test.mjs` 13 项（onset/网格/采集/合并/评分/选窗/卡点层，含用桩 `TimelineVisuals` 跑 `beatmapOf`/`alignOf` 的帧算术与"只有漂移才出卡点层"）、`test/jobs-timeout.test.mjs` 4 项、可本机跑的 worker 纯单测 54 项全绿；`schema.test.mjs` 的静态协议覆盖项通过（spawn worker 的集成项仍受 win32 边界限制）；model-contract 全绿（新增白名单逐字一致、worker/schema/README 三处 parity、第四份 skill 关键词、两个门面的行为桩与参数契约；`checks` 计数改为按源文件统计，不再手写）；check.mjs **58/0**、smoke-client **86/0**、audio provider、plugin-settings、stage-version 10/0 全绿；check-host 与 audio-host 结果见下一节合并提交说明（本机 symlink/worker 平台边界项按既有基线记录）。
+- 本机（Windows）验证：`test/beat.test.mjs` 13 项（onset/网格/采集/合并/评分/选窗/卡点层，含用桩 `TimelineVisuals` 跑 `beatmapOf`/`alignOf` 的帧算术与"只有漂移才出卡点层"）、`test/jobs-timeout.test.mjs` 4 项、可本机跑的 worker 纯单测 54 项全绿；`schema.test.mjs` 的静态协议覆盖项通过（spawn worker 的集成项仍受 win32 边界限制）；model-contract 全绿（新增白名单逐字一致、worker/schema/README 三处 parity、第四份 skill 关键词、两个门面的行为桩与参数契约；`checks` 计数改为按源文件统计，不再手写）；check.mjs **58/0**、smoke-client **86/0**、audio provider、plugin-settings、stage-version 10/0 全绿；check-host **60 通过/11 失败**（11 项均为本机 symlink EINVAL 平台边界，与基线一致）；`test-v1-audio-host` 与 `test-audio-creation` 在本机因引擎 worker 拒绝 win32 直接 `E_PROCESS_EXIT`（既有平台边界，需 macOS/Linux 补证）。
 - 未验证与边界：真实云端模型仍不接受时长字段，本次只保证"选窗/速度/卡点层"这三件事由测量决定；onset 检测基于 8kHz 峰值包络（无频谱通量），氛围型音乐可能检不到拍；`beatLayer` 是合成打击层，不是真鼓组；端到端（beatmap→云生成→align→叠层）与真实导出证据必须由用户 macOS 实机复验，本会话不作已验收声明。
 
-## 开发中：长片导出不再在收尾处静默消失（codex/render-validate-timeout）
+## 已合入 main（PR #11）：长片导出不再在收尾处静默消失
 
 用户实机：1080×1920@30fps、159.8s 整片导出两次都在 `stage: finished / progress 1` 后变成 `timed_out`，全盘搜不到新 mp4、导出目录为空、无日志；换 720×1280 抓帧明显更快。
 
@@ -22,7 +24,7 @@
 - 修复：新增两个纯函数预算 `renderTimeoutMs(frames)=min(6h, max(300s, 120000+240×frames))`（原 `60000+140×frames` 对 1080p 吞吐只有 1.28 倍余量，代码注释自证 20s 合成实测 ~112s≈187ms/帧）与 `validateProbeTimeoutMs(frames)=max(15s, 10000+25×frames)`（按最坏 40 帧/秒解码计数，159.8s → ≈129.9s）；两处 `timed_out` 出口（引擎子进程、计数探测）都写 `error{code:"E_TIMEOUT", stage}`；顶部"15 分钟 ceiling"陈旧注释改为实际公式。
 - 客户端两处导出入口统一预算：抽出 `renderBudgetMs(seconds)` + `EXPORT_POST_CAPTURE_SLACK_MS`（抓帧之后还有两遍 loudnorm 与全帧校验）。顶栏此前轮询窗口（13.2 分钟）**小于**它自己请求的引擎 15 分钟，到期即 `cancel` 并追回已发布文件；画布 `exportVideo()` 更是写死 `240×500ms≈120s` 且不传 `timeoutMs`，长片必失败——现在两者共用同一式并带超时后取消。
 - `host/config.js` 默认 `maxArtifactBytes` 64MiB → **192MiB**（1080×1920 数分钟成片常见 40–120MB，会撞下载上限；`readArtifact` 仍是全量读入 + SHA256，流式下载列为后续项，上限校验规则本身允许到 256MiB）。
-- 本机（Windows）验证：新增 `packages/video-engine-worker/test/jobs-timeout.test.mjs` 4 项（含"计数探测不再写死 15 秒""两处 timed_out 都带 E_TIMEOUT"源文本断言）；worker 纯单测 29 项全绿；model-contract 27 项（新增 4 项预算 parity 断言，固定指令实测仍为 contextChars 6092/customChars 7957）；check.mjs **58/0**、smoke-client **86/0**（导出项断言随之改为 300000）、check-host **60 通过/11 失败**（11 项均为本机 symlink EINVAL 平台边界，与基线一致）。`packages/video-engine-worker/test/worker.test.mjs` 在本机因缺少嵌套 `node_modules/gsap` 而 ENOENT，属环境缺失，非本次引入。
+- 本机（Windows）验证（PR #11 当时）：新增 `packages/video-engine-worker/test/jobs-timeout.test.mjs` 4 项（含"计数探测不再写死 15 秒""两处 timed_out 都带 E_TIMEOUT"源文本断言）；worker 纯单测 29 项全绿；model-contract 通过（新增 4 项预算 parity 断言，当时固定指令 contextChars 6092/customChars 7957）；check.mjs **58/0**、smoke-client **86/0**（导出项断言随之改为 300000）、check-host **60 通过/11 失败**（11 项均为本机 symlink EINVAL 平台边界，与基线一致）。`packages/video-engine-worker/test/worker.test.mjs` 在本机因缺少嵌套 `node_modules/gsap` 而 ENOENT，属环境缺失，非本次引入。（PR #12 合入后同一组门禁重跑仍全绿，预算数字变为 6109/7974，见上一节。）
 - 未验证：真实长片导出证据必须由用户 macOS 实机复跑（引擎 worker 明确拒绝 win32，见 1.0.1/1.0.2 一节同一边界）；若成片体积超过 192MiB 会返回 `E_ARTIFACT_LIMIT`，届时再决定流式下载。
 
 ## 1.0.3：围栏 fake-IP 修复、选区配乐两阶段、整曲窗口对齐与三份配乐 skill
