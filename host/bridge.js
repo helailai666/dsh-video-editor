@@ -32,7 +32,7 @@ import { PluginSettingsStore } from './plugin-settings.js';
 import { dataRootLayout, ensureDataRoot, legacyRootsFromConfig, loadManagedProjects, migrateLegacyRoots, quarantineCorruptFile, readWorkerRegistry, repairProjectsRegistry, resolveDataRoot, scanProjectsRoot, writeProjectsBackup } from './data-root.js';
 
 export const REQUEST_METHODS = Object.freeze([
-'reference.list', 'timeline.references', 'timeline.visuals.request', 'timeline.visuals.status', 'timeline.visuals.cancel', 'timeline.audioProfile',
+'reference.list', 'timeline.references', 'timeline.visuals.request', 'timeline.visuals.status', 'timeline.visuals.cancel', 'timeline.audioProfile', 'timeline.beatmap', 'asset.align',
 'audio.guide','audio.recipe','audio.providers','audio.settings','audio.configure','audio.check','audio.generate','audio.status','audio.cancel',
 'audio.model.save','audio.model.remove','audio.model.default',
 'prompt.get','prompt.set',
@@ -104,6 +104,8 @@ const METHOD_PARAMS = Object.freeze({
  'timeline.visuals.status': ['projectId','taskId'],
  'timeline.visuals.cancel': ['projectId','taskId'],
  'timeline.audioProfile': ['projectId','fromFrame','toFrame','assetId'],
+ 'timeline.beatmap': ['projectId','fromFrame','toFrame'],
+ 'asset.align': ['projectId','assetId','fromFrame','toFrame','hitFrames','tempoLock'],
  'timeline.inspect': ['projectId', 'view', 'trackId', 'offset', 'limit'],
 'timeline.apply': ['projectId', 'expectedRevision', 'operationId', 'ops', 'dryRun'],
 'timeline.resolve': ['projectId', 'revision', 'refs'],
@@ -478,6 +480,24 @@ export function validateParams(config, method, params) {
   }
   if(method.startsWith('timeline.visuals.')) {const next={...params,projectId:allowedProject(config,params.projectId)};if(method.endsWith('request')){next.expectedRevision=revision(params.expectedRevision);if(!/^cl_[a-z0-9]+$/.test(params.clipId)||![params.startFrame,params.endFrame,params.count].every(Number.isSafeInteger)||params.startFrame<0||params.endFrame<=params.startFrame||params.count<1||params.count>4)fail('E_PARAMS','Invalid visual request');}else if(!/^[a-f0-9]{24}$/.test(params.taskId))fail('E_PARAMS','Invalid visual task');return next;}
   if(method==='timeline.audioProfile'){const next={projectId:allowedProject(config,params.projectId)};const hasAsset=typeof params.assetId==='string'&&/^as_[a-f0-9]{8}$/.test(params.assetId);const hasRange=Number.isSafeInteger(params.fromFrame)&&Number.isSafeInteger(params.toFrame)&&params.fromFrame>=0&&params.toFrame<=108000&&params.toFrame>params.fromFrame;if(hasAsset===hasRange)fail('E_PARAMS','Provide either assetId or fromFrame/toFrame for the audio profile','params');if(hasAsset)next.assetId=params.assetId;else{next.fromFrame=params.fromFrame;next.toFrame=params.toFrame;}return next;}
+  if(method==='timeline.beatmap'||method==='asset.align'){
+    // Both are read-only rhythm analysis over the same bounded window rule the
+    // loudness profile already uses: integer frames, at most six minutes.
+    const inRange=Number.isSafeInteger(params.fromFrame)&&Number.isSafeInteger(params.toFrame)&&params.fromFrame>=0&&params.toFrame<=108000&&params.toFrame>params.fromFrame&&params.toFrame-params.fromFrame<=10800;
+    if(!inRange)fail('E_PARAMS','Beat analysis needs integer frames inside a six minute range','params');
+    const next={projectId:allowedProject(config,params.projectId),fromFrame:params.fromFrame,toFrame:params.toFrame};
+    if(method==='asset.align'){
+      if(typeof params.assetId!=='string'||!/^as_[a-f0-9]{8}$/.test(params.assetId))fail('E_PARAMS','asset.align needs a generated music assetId','params');
+      next.assetId=params.assetId;
+      if(params.hitFrames!==undefined){
+        const bad=!Array.isArray(params.hitFrames)||!params.hitFrames.length||params.hitFrames.length>256||params.hitFrames.some((frame,index)=>!Number.isSafeInteger(frame)||frame<=params.fromFrame||frame>params.toFrame||(index>0&&params.hitFrames[index-1]>=frame));
+        if(bad)fail('E_PARAMS','hitFrames needs up to 256 ascending frames inside the range','params');
+        next.hitFrames=params.hitFrames;
+      }
+      if(params.tempoLock!==undefined){if(typeof params.tempoLock!=='boolean')fail('E_PARAMS','tempoLock must be a boolean','params');next.tempoLock=params.tempoLock;}
+    }
+    return next;
+  }
   if (['timeline.references','timeline.inspect','timeline.apply','timeline.resolve','timeline.undo','timeline.redo','scene.compose','scene.inspect'].includes(method)) {
     const next={...params,projectId:allowedProject(config,params.projectId)};
     if(['timeline.apply','timeline.undo','timeline.redo','scene.compose'].includes(method)){next.expectedRevision=revision(params.expectedRevision);next.operationId=operationId(params.operationId);}
@@ -1923,6 +1943,44 @@ export class VideoBridge {
       note: 'whole-asset envelope at ~1s buckets; pick the window whose arc matches the confirmed table and insert it with sourceInFrame',
     };
   }
+  /**
+   * Deterministic picture hit map for a range: real cut frames plus measured
+   * audio onsets. Range scoring must quote these frames instead of guessing
+   * where the story turns.
+   */
+  async beatmap(params) {
+    const timeline = await this.callClient('timeline.inspect', { projectId: params.projectId });
+    this.rememberFacts({ ...timeline, timeline: true });
+    return this.callClient('timeline.beatmap', {
+      projectId: params.projectId,
+      revision: timeline.revision,
+      fromFrame: params.fromFrame,
+      toFrame: params.toFrame,
+    });
+  }
+  /** Measure a generated song against those hits before it is placed. */
+  async alignMusic(params) {
+    const timeline = await this.callClient('timeline.inspect', { projectId: params.projectId });
+    this.rememberFacts({ ...timeline, timeline: true });
+    const request = {
+      projectId: params.projectId,
+      revision: timeline.revision,
+      assetId: params.assetId,
+      fromFrame: params.fromFrame,
+      toFrame: params.toFrame,
+      tempoLock: params.tempoLock === undefined ? true : params.tempoLock,
+    };
+    if (params.hitFrames !== undefined) request.hitFrames = params.hitFrames;
+    const result = await this.callClient('asset.align', request);
+    const best = result.best;
+    const steps = [`insert clip.insert(assetId:${params.assetId}, startFrame:${result.fromFrame}, durationFrames:${result.rangeFrames}, sourceInFrame:${best.sourceInFrame}, mode:"reject")`];
+    if (best.speed !== 1) steps.push(`then clip.speed(clipId:<new>, speed:${best.speed})`);
+    if (result.beatLayer) steps.push('then lay beatLayer.score on a second audio track with audio.generate(kind:"sfx", provider:"procedural") - free and unbilled');
+    return {
+      ...result,
+      note: `hitRate ${best.hitRate}, mean drift ${best.meanErrorFrames} frames, max ${best.maxErrorFrames} frames; ${steps.join('; ')}`,
+    };
+  }
   /** One visuals window -> waveform peaks, or null when it cannot be sampled. */
   async sampleClipWaveform(projectId, revision, window, deadline) {
     let task = await this.callClient('timeline.visuals.request', {
@@ -1970,6 +2028,13 @@ export class VideoBridge {
       const result=await this.audioProfile(normalized);
       return publicResult(config.maxResultBytes,result,settings.source);
     }
+    if(method==='timeline.beatmap'||method==='asset.align'){
+      // Same facade rule as the loudness profile: measured rhythm is readable by
+      // the model, the peaks pyramid and journal behind it stay UI-only.
+      if(settings.source==='tool')await this.assertToolScope(method,normalized,settings.agentSessionId);
+      const result=await (method==='asset.align'?this.alignMusic(normalized):this.beatmap(normalized));
+      return publicResult(config.maxResultBytes,result,settings.source);
+    }
     if(method==='reference.list'){
       if(settings.source==='tool')throw new BridgeError('E_METHOD','Reference menu is UI-only');
       const projectId=await this.sessions.projectForSession(normalized.sessionId);
@@ -1997,7 +2062,7 @@ export class VideoBridge {
       else if(method==='audio.model.remove')result=await this.audio.removeModel(normalized.modelId);
       else if(method==='audio.model.default')result=await this.audio.setDefaultModel(normalized.modelId);
       else if(method==='audio.check')result=await this.audio.check(normalized.modelId);
-      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/drama-beat-shifts/SKILL.md',import.meta.url),'utf8'))};
+      else if(method==='audio.guide')result={skill:(await readFile(new URL('../skills/audio-creation/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/music-scoring-library/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/drama-beat-shifts/SKILL.md',import.meta.url),'utf8'))+'\n\n'+(await readFile(new URL('../skills/beat-alignment/SKILL.md',import.meta.url),'utf8'))};
       else if(method==='audio.recipe')result=await this.audio.recipe(normalized.projectId,normalized.jobId);
       else if(method==='audio.generate')result=await this.audio.generate(normalized);
       else if(method==='audio.cancel')result=await this.audio.cancel(normalized.projectId,normalized.jobId);

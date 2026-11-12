@@ -250,6 +250,49 @@ async function method(name, p) {
         ));
       return visuals.envelopeOf(p);
     }
+    case "timeline.beatmap":
+    case "asset.align": {
+      // Read-only rhythm analysis. Both answers are bounded so one JSONL reply
+      // stays far below the client line limit, and both need the timeline
+      // journal plus the cached peaks pyramid rather than a fresh decode.
+      keys(
+        p,
+        name === "asset.align"
+          ? ["projectId", "revision", "assetId", "fromFrame", "toFrame", "hitFrames", "tempoLock"]
+          : ["projectId", "revision", "fromFrame", "toFrame"],
+        ["projectId", "revision", "fromFrame", "toFrame"],
+      );
+      string(p.projectId);
+      revision(p.revision);
+      number(p.fromFrame, 0, 108000);
+      number(p.toFrame, p.fromFrame + 1, 108000);
+      if (!Number.isInteger(p.fromFrame) || !Number.isInteger(p.toFrame) || p.toFrame - p.fromFrame > 10800)
+        fail("E_PARAMS", "Beat window must be integer frames within six minutes");
+      if (name === "asset.align") {
+        validateAssetRemove({ projectId: p.projectId, assetId: p.assetId });
+        if (p.hitFrames !== undefined) {
+          if (!Array.isArray(p.hitFrames) || p.hitFrames.length > 256 || p.hitFrames.some((frame) => !Number.isInteger(frame)))
+            fail("E_PARAMS", "hitFrames needs up to 256 integer timeline frames");
+        }
+        if (p.tempoLock !== undefined && typeof p.tempoLock !== "boolean")
+          fail("E_PARAMS", "tempoLock must be a boolean");
+      }
+      store.assertNotClosing(p.projectId);
+      await store.requestOpen(p.projectId);
+      const timelines =
+        store.timelines ?? (store.timelines = new Timelines(store, media));
+      const visuals =
+        store.visuals ??
+        (store.visuals = new TimelineVisuals(timelines, () =>
+          [...jobs.jobs.values()].some(
+            (job) =>
+              !["succeeded", "failed", "cancelled", "timed_out"].includes(
+                job.state,
+              ),
+          ),
+        ));
+      return name === "asset.align" ? visuals.alignOf(p) : visuals.beatmapOf(p);
+    }
     case "asset.import":
       validateImportAsset(p);
       return store.importAsset(p);
