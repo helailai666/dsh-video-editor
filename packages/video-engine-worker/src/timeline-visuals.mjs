@@ -7,6 +7,7 @@ import {fail} from './errors.mjs';
 import {timelineRevision} from './timeline.mjs';
 import {sourceSeconds} from './visuals.mjs';
 import {inside} from './registry.mjs';
+import {chooseWindow, compileBeatLayer, estimateGrid, mergeOnsetHits, onsetsFromEnvelope, pictureHits} from './beat.mjs';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 export function validateVisualRequest(p){
  if(!/^cl_[a-z0-9]+$/.test(p.clipId)||!Number.isSafeInteger(p.startFrame)||!Number.isSafeInteger(p.endFrame)||p.startFrame<0||p.endFrame<=p.startFrame||!Number.isSafeInteger(p.count)||p.count<1||p.count>4)fail('E_PARAMS','Invalid visual sampling window');
@@ -93,6 +94,117 @@ export class TimelineVisuals {
    while(levels.at(-1).peaks.length>1){const prev=levels.at(-1),p=[],r=[];for(let i=0;i<prev.peaks.length;i+=2){p.push(Math.max(prev.peaks[i],prev.peaks[i+1]??0));r.push(Math.sqrt((prev.rms[i]**2+(prev.rms[i+1]??prev.rms[i])**2)/2));}levels.push({seconds:prev.seconds*2,peaks:p,rms:r});}
    await writeFile(output,JSON.stringify({peak:Math.max(0,...levels.at(-1).peaks),levels}));
   });return JSON.parse(bytes);
+ }
+ // Song onsets are measured on the finest cached level (16ms) and reported in
+ // timeline-frame units (@30fps) so picture cuts and music hits stay comparable.
+ async songEnvelope(p){
+  const file=await this.timelines.media.resolveFile({projectId:p.projectId,assetId:p.assetId});
+  if(!file||file.asset.kind==='image')fail('E_PARAMS','Asset has no audio envelope');
+  if(file.asset.kind!=='audio'&&file.asset.hasAudio!==true)fail('E_PARAMS','Asset has no audio');
+  const root=await this.cacheRoot(p.projectId);
+  const abort=new AbortController();
+  const timer=setTimeout(()=>abort.abort(),60000);
+  let data;
+  try{data=await this.envelope(file,root,abort.signal);}finally{clearTimeout(timer);}
+  const level=data.levels[0];
+  const onsets=onsetsFromEnvelope(level.peaks,{bucketSeconds:level.seconds,materialPeak:data.peak});
+  return {asset:file.asset,song:{fps:file.asset.fps||30,durationSeconds:Number((level.peaks.length*level.seconds).toFixed(3)),onsetFrames:onsets.times.map(time=>Math.round(time*30)),truncated:onsets.truncated,grid:estimateGrid(onsets.times)}};
+ }
+ async beatmapOf(p){
+  const journal=await this.timelines.load(p.projectId),t=journal?.timeline;
+  if(!t||timelineRevision(t)!==p.revision)fail('E_REVISION_CONFLICT','Timeline changed');
+  const hits=pictureHits({tracks:t.tracks,fromFrame:p.fromFrame,toFrame:p.toFrame,fps:30});
+  const assets=new Map((t.assets??[]).map(a=>[a.assetId,a]));
+  const windows=[];
+  for(const track of t.tracks??[])for(const clip of track.clips??[]){
+   const start=Math.max(clip.startFrame,p.fromFrame),end=Math.min(clip.startFrame+(clip.durationFrames??0),p.toFrame);
+   if(end<=start)continue;
+   const a=assets.get(clip.assetId);
+   if(!a||(a.kind!=='audio'&&a.hasAudio!==true))continue;
+   if(track.muted===true||clip.muted===true)continue;
+   windows.push({clip,asset:a});
+  }
+  if(windows.length>16)fail('E_LIMIT','Too many audible clips in the range; shorten it and retry');
+  const root=await this.cacheRoot(p.projectId);
+  const abort=new AbortController();
+  const timer=setTimeout(()=>abort.abort(),60000);
+  const pairs=[];
+  let sampled=0,unsampled=0;
+  try{
+   for(const {clip,asset} of windows){
+    if(abort.signal.aborted){unsampled++;continue;}
+    const file=await this.timelines.media.resolveFile({projectId:p.projectId,assetId:asset.assetId});
+    if(!file||file.asset.kind==='image'){unsampled++;continue;}
+    let data;
+    try{data=await this.envelope(file,root,abort.signal);}catch{unsampled++;continue;}
+    sampled++;
+    const level=data.levels[0],fps=asset.fps||30;
+    const fromSource=sourceSeconds(clip,p.fromFrame,fps),toSource=sourceSeconds(clip,p.toFrame,fps);
+    const lo=Math.max(0,Math.floor(fromSource/level.seconds)),hi=Math.min(level.peaks.length,Math.ceil(toSource/level.seconds));
+    if(hi<=lo)continue;
+    const found=onsetsFromEnvelope(level.peaks.slice(lo,hi),{bucketSeconds:level.seconds,materialPeak:data.peak});
+    for(let index=0;index<found.times.length;index+=1){
+     const sourceTime=fromSource+found.times[index];
+     const frame=clip.startFrame+((sourceTime-(clip.sourceInFrame??0)/fps)*30)/(clip.speed??1);
+     const seconds=(frame-p.fromFrame)/30;
+     if(!(seconds>=0)||seconds*30>p.toFrame-p.fromFrame)continue;
+     pairs.push({seconds:Number(seconds.toFixed(3)),strength:found.strengths[index]});
+    }
+   }
+  }finally{clearTimeout(timer);}
+  pairs.sort((a,b)=>a.seconds-b.seconds);
+  const merged=mergeOnsetHits(hits,{times:pairs.map(pair=>pair.seconds),strengths:pairs.map(pair=>pair.strength)},{fromFrame:p.fromFrame,toFrame:p.toFrame,fps:30});
+  return {
+   revision:p.revision,fps:30,fromFrame:p.fromFrame,toFrame:p.toFrame,rangeFrames:p.toFrame-p.fromFrame,
+   hits:merged.hits,
+   grid:estimateGrid(merged.hits.map(hit=>hit.seconds)),
+   cutCount:merged.hits.filter(hit=>hit.source==='cut').length,
+   onsetCount:merged.hits.filter(hit=>hit.source==='onset').length,
+   sampledClips:sampled,
+   unsampledClips:unsampled,
+   truncated:merged.truncated===true,
+  };
+ }
+ async alignOf(p){
+  const journal=await this.timelines.load(p.projectId),t=journal?.timeline;
+  if(!t||timelineRevision(t)!==p.revision)fail('E_REVISION_CONFLICT','Timeline changed');
+  const rangeFrames=p.toFrame-p.fromFrame,locked=p.tempoLock!==false;
+  let hits,grid;
+  if(Array.isArray(p.hitFrames)&&p.hitFrames.length){
+   hits=p.hitFrames.filter(frame=>Number.isInteger(frame)&&frame>p.fromFrame&&frame<=p.toFrame).slice(0,256)
+    .map(frame=>({frame,seconds:Number(((frame-p.fromFrame)/30).toFixed(3)),source:'cut',strength:1}));
+   grid=estimateGrid(hits.map(hit=>hit.seconds));
+  }else{
+   const beat=await this.beatmapOf(p);
+   hits=beat.hits;grid=beat.grid;
+  }
+  const hitFrames=hits.map(hit=>hit.frame);
+  if(!hitFrames.length)fail('E_PARAMS','No picture hits inside the range to align against');
+  const {song}=await this.songEnvelope(p);
+  if(!song.onsetFrames.length)fail('E_PARAMS','The asset has no measurable onsets; place it manually');
+  const chosen=chooseWindow({hitFrames,onsetFrames:song.onsetFrames,baseFrame:p.fromFrame,rangeFrames,assetDurationFrames:Math.round(song.durationSeconds*30),grid,songGrid:song.grid,tempoLock:locked});
+  const best=chosen.best;
+  const warnings=[];
+  if(song.truncated===true)warnings.push('song onsets truncated to the strongest 400');
+  if(!song.grid.bpm)warnings.push('no trustworthy song pulse; the picture cut grid decided the window');
+  if(best.speed!==1)warnings.push(`tempo locked at ${best.speed}x; apply it with clip.speed`);
+  const drift=best.drift.map(item=>Object.assign({},item,{hitSeconds:Number(((item.hitFrame-p.fromFrame)/30).toFixed(3))}));
+  const aligned=best.hitRate>=0.8;
+  const score=aligned?null:compileBeatLayer({hits,grid,rangeSeconds:rangeFrames/30});
+  const result={
+   revision:p.revision,assetId:p.assetId,assetFps:song.fps,assetDurationSeconds:song.durationSeconds,
+   fromFrame:p.fromFrame,toFrame:p.toFrame,rangeFrames,hitCount:hitFrames.length,
+   song:{bpm:song.grid.bpm,intervalSeconds:song.grid.intervalSeconds,confidence:song.grid.confidence,onsetCount:song.onsetFrames.length},
+   grid:{bpm:grid.bpm,intervalSeconds:grid.intervalSeconds,confidence:grid.confidence},
+   tempoLock:locked,
+   candidates:chosen.candidates.map(candidate=>Object.assign({},candidate,{sourceInFrame:Math.round(candidate.seconds*song.fps)})),
+   best:Object.assign({},best,{sourceInFrame:Math.round(best.seconds*song.fps),drift}),
+   beatLayer:score?{score}:null,
+   beatLayerReason:aligned?'aligned':'drift',
+   warnings,
+  };
+  if(JSON.stringify(result).length>48000)fail('E_LIMIT','Beat result too large; shorten the range');
+  return result;
  }
  async sample(t,c,p,signal){
   const root=await this.cacheRoot(t.projectId),a=t.assets.find(x=>x.assetId===c.assetId),result={thumbnails:[],waveform:null};

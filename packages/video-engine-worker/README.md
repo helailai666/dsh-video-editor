@@ -314,6 +314,7 @@ JSONL v1 方法集新增 1 个 UI-only 方法（共 25 个）；既有方法的�
 | `asset.list` | `{projectId,kind?,query?,cursor?,limit?}`；最多 50 项，不返回磁盘路径；含独立 indexRevision |
 | `asset.derive` | `{projectId,assetId,kind:"thumb"或"waveform"或"proxy"}`；独立异步请求，缩略图/波形 30 秒、兼容代理 110 秒超时，可重试；工程私有缓存可重建 |
 | `asset.envelope` | `{projectId,assetId}`；返回整条素材的逐秒级响度包络（约 1 秒桶的 peaks/rms + materialPeak），复用 timeline-visuals 的 peaks-v1 缓存，供选区配乐在上轨前挑选插入窗口；只读，无音频素材拒绝 |
+| `asset.align` | `{projectId,revision,assetId,fromFrame,toFrame,hitFrames?,tempoLock?}`；在 peaks-v1 最细一层（16ms）测出歌曲 onset 与节拍网格，与画面卡点（hitFrames 缺省时由 `timeline.beatmap` 自测）比对，返回最佳插入窗口 `best.sourceInFrame`（素材帧）、可选 `best.speed`（0.90–1.12，用 `clip.speed` 落地）、逐命中漂移与 `hitRate`；`hitRate<0.8` 时附免费本地卡点层 `beatLayer.score`。只读，最多 3 个候选、20 项漂移，60 秒解码截止 |
 | `asset.remove` | `{projectId,assetId,operationId?}`；检查 timeline/project/composition 引用；先暂存媒体，再原子提交索引，失败恢复媒体 |
 
 媒体索引与派生缓存独立于 composition revision。所有媒体操作复用工程写入队列，关闭/退出排空；单文件 2 GiB、工程 8 GiB。损坏索引保留 `.corrupt-*` 后重建，缺失索引从 media 重建。M2 不把素材自动放入作品，时间线由 M3 接入。
@@ -323,6 +324,7 @@ JSONL v1 方法集新增 1 个 UI-only 方法（共 25 个）；既有方法的�
 | `timeline.visuals.request` | UI background derivation: projectId, expectedRevision, clipId, bounded visible frame window, count 1–4; returns taskId |
 | `timeline.visuals.status` | Project-scoped task status and bounded image/peak data; no disk paths |
 | `timeline.visuals.cancel` | Cancel this view request without editing content |
+| `timeline.beatmap` | `{projectId,revision,fromFrame,toFrame}`；把未静音视觉轨的真实切换帧与 peaks-v1（16ms）测得的音频 onset 合成确定性卡点图，返回 `hits[{frame,seconds,pct,source,strength,aligned?}]`、画面 `grid{bpm,intervalSeconds,phaseSeconds,confidence}` 与采样计数；只读，最多 16 个可听片段/120 个卡点，60 秒解码截止 |
 | `timeline.inspect` | Timeline truth, integer frames, expectedRevision for writes |
 | `timeline.apply` | Timeline truth, integer frames, expectedRevision for writes |
 | `timeline.references` | Current project clip/scene/asset/range tokens; query, offset/limit |

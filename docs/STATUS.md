@@ -2,6 +2,18 @@
 
 更新：2026-11-11。
 
+## 开发中：卡点改为可测量（timeline.beatmap + asset.align + 免费本地卡点层）
+
+用户实机反馈：1.0.3 之后云端配乐"风格对，但没踩在剧情卡点上"。原因是整条链路里没有任何节拍测量代码——卡点位置、生成后"命中/漂移几秒"全靠模型读逐秒数组目测，而 StepFun/Suno/MiniMax 连时长字段都不接受，"50% 处的重击"落地秒数天然漂移。本次把节奏变成引擎算出来的事实。
+
+- 引擎新增纯函数模块 `packages/video-engine-worker/src/beat.mjs`（零 IO、可 win32 单测）：16ms 峰值包络上的 energy-flux onset 检测（自适应局部中值阈值 + 0.12s 最小间隔 + 400 上限）、节拍网格估计（0.3–1.5s 间隔众数→BPM/相位/confidence）、画面真实切换帧采集、onset 与 cut 的合并（≤6 帧视为同一硬点）、按窗口的对齐评分（`hitRate/meanErrorFrames/maxErrorFrames` + ≤20 项逐命中漂移）、候选窗口搜索（≤200 个 onset 起点 + 0，tempoLock 时增加 `grid.bpm/song.bpm` 的 0.90–1.12 速度候选）、以及把卡点编译成 `host/audio-synth.js` 可直接接受的 procedural score（kick/bass/riser/whoosh/hat，守 512 事件与 900 事件秒上限，事件不越过 duration）。
+- 两个只读引擎方法（协议 0.9.0 原位扩展，不 bump）：`timeline.beatmap{projectId,revision,fromFrame,toFrame}` 返回卡点图与画面网格；`asset.align{projectId,revision,assetId,fromFrame,toFrame,hitFrames?,tempoLock?}` 返回 `best{sourceInFrame,speed,hitRate,drift}`、≤3 候选、`beatLayer.score`（`hitRate<0.8` 才给，本地合成、不计费）与 `warnings`。实现复用已有 peaks-v1 缓存与"≤16 可听片段/60s 解码截止"边界；响应有 48KB 硬护栏（单行 JSONL 超 64KB 会被判协议故障）。`protocol.schema.json` 增 params/request/result 两组并挂进 `x-methods`；README 方法表补两行。
+- Host：`bridge.js` 新增 `timeline.beatmap`/`asset.align` 白名单、参数校验（整数帧、≤10800 跨度、`as_[a-f0-9]{8}`、hitFrames ≤256 严格递增且落在区间内、tempoLock 布尔）与门面（先 `timeline.inspect` 取权威 revision 再转发；`asset.align` 结果附一行可直接执行的 `note`：insert 参数、`clip.speed`、卡点层走 `kind sfx provider procedural`）；`tool.js` 暴露两个动作并改写两阶段契约描述——阶段一必须用 beatmap 的真实帧/pct 绑定卡点，阶段二生成后必须 `asset.align` 并按 `best` 上轨、如实报告 hitRate 与漂移帧数。
+- 第四份 skill `skills/beat-alignment/SKILL.md`（`audio.guide` 现拼接四份，`package.json`/`stage-dev.mjs` 已收录）：卡点必须来自测量、结构线写成 `<pct%> <音乐动作>（对准 <画面事件> @<frame>帧）` 并把 `grid.bpm` 写进提示词、生成后必须量一次、漂移时叠免费卡点层（并发为 1，须在云歌终态后发起）、多 cue 逐条走 beatmap→generate→align、自检清单与诚实边界（检不到拍时 `grid.bpm:null`，退回 cut 网格并如实说明，不得声称已锁拍）。audio-creation 第 2/3/7 步与配乐库的选窗段同步改为引用这两个方法，不再要求模型目测数组自评。
+- 固定指令按预算做了净零改写（新增 beatmap/asset.align 要求同时压缩原句）：`contextChars 6109`（<6500）、含 2000 字符自定义块 `customChars 7974`（≤8000），关键门控短语全部保留。
+- 本机（Windows）验证：`test/beat.test.mjs` 13 项（onset/网格/采集/合并/评分/选窗/卡点层，含用桩 `TimelineVisuals` 跑 `beatmapOf`/`alignOf` 的帧算术与"只有漂移才出卡点层"）、`test/jobs-timeout.test.mjs` 4 项、可本机跑的 worker 纯单测 54 项全绿；`schema.test.mjs` 的静态协议覆盖项通过（spawn worker 的集成项仍受 win32 边界限制）；model-contract 全绿（新增白名单逐字一致、worker/schema/README 三处 parity、第四份 skill 关键词、两个门面的行为桩与参数契约；`checks` 计数改为按源文件统计，不再手写）；check.mjs **58/0**、smoke-client **86/0**、audio provider、plugin-settings、stage-version 10/0 全绿；check-host 与 audio-host 结果见下一节合并提交说明（本机 symlink/worker 平台边界项按既有基线记录）。
+- 未验证与边界：真实云端模型仍不接受时长字段，本次只保证"选窗/速度/卡点层"这三件事由测量决定；onset 检测基于 8kHz 峰值包络（无频谱通量），氛围型音乐可能检不到拍；`beatLayer` 是合成打击层，不是真鼓组；端到端（beatmap→云生成→align→叠层）与真实导出证据必须由用户 macOS 实机复验，本会话不作已验收声明。
+
 ## 开发中：长片导出不再在收尾处静默消失（codex/render-validate-timeout）
 
 用户实机：1080×1920@30fps、159.8s 整片导出两次都在 `stage: finished / progress 1` 后变成 `timed_out`，全盘搜不到新 mp4、导出目录为空、无日志；换 720×1280 抓帧明显更快。

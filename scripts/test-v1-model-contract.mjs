@@ -24,18 +24,30 @@ assert(clientSource.includes("t('video.timeline.rangeRequest')"),'the sent range
 assert(text.includes('timeline.audioProfile'),'stage 1 must read the loudness curve');
 assert(text.includes('时间段（秒）'),'the user-facing table columns are fixed');
 assert(text.includes('END THE TURN'),'the prompt must wait for explicit approval before audio.generate');
-assert(text.includes('timeline.audioProfile(projectId,assetId)'),'the fixed line must teach whole-song window picking');
+assert(text.includes('timeline.beatmap(projectId,fromFrame,toFrame)'),'stage 1 must measure the real picture hit frames, not imagine them');
+assert(text.includes('asset.align(projectId,assetId'),'a whole cloud song must be measured against those hits before it is placed');
+assert(text.includes('hitRate')&&text.includes('beatLayer'),'the fixed line must report the measured hit rate and the free beat layer');
 const bridgeSourceForProfile=await readFile('host/bridge.js','utf8');
 assert(bridgeSourceForProfile.includes("'timeline.audioProfile': ['projectId','fromFrame','toFrame','assetId']"),'audioProfile needs an exact parameter whitelist');
 const toolSourceForProfile=await readFile('host/tool.js','utf8');
 assert(toolSourceForProfile.includes("'timeline.audioProfile':['projectId','fromFrame','toFrame','assetId']"),'the Tool must expose audioProfile with the same fields');
-// The engine gained asset.envelope: worker case, schema parity and README entry must agree.
+// The engine gained measured rhythm: same field lists on both sides, plus case/schema/README parity.
+for(const whitelist of ["'timeline.beatmap': ['projectId','fromFrame','toFrame']","'asset.align': ['projectId','assetId','fromFrame','toFrame','hitFrames','tempoLock']"]){
+  assert(bridgeSourceForProfile.includes(whitelist),`the Host needs the exact whitelist ${whitelist}`);
+  assert(toolSourceForProfile.includes(whitelist),`the Tool must expose the same fields for ${whitelist.split(':')[0]}`);
+}
 const workerSource=await readFile('packages/video-engine-worker/src/worker.mjs','utf8');
 assert(workerSource.includes('case "asset.envelope"'),'the worker must dispatch asset.envelope');
+assert(workerSource.includes('case "timeline.beatmap"')&&workerSource.includes('case "asset.align"'),'the worker must dispatch the beat analysis methods');
 const schemaText=await readFile('packages/video-engine-worker/protocol.schema.json','utf8');
 assert(schemaText.includes('"asset.envelope"'),'the protocol schema must document asset.envelope');
+for(const method of ['timeline.beatmap','asset.align']){
+  const def=`params_${method.replace('.','_')}`;
+  assert(schemaText.includes(`"${method}"`)&&schemaText.includes(`"${def}"`)&&schemaText.includes(`result_${method.replace('.','_')}`),`the protocol schema must pin ${method}`);
+}
 const workerReadme=await readFile('packages/video-engine-worker/README.md','utf8');
 assert(workerReadme.includes('`asset.envelope`'),'the worker README must list asset.envelope');
+assert(workerReadme.includes('`timeline.beatmap`')&&workerReadme.includes('`asset.align`'),'the worker README must list the beat analysis methods');
 // ── Render deadline: one budget shared by the worker, the topbar and the canvas ──
 const jobsSource=await readFile('packages/video-engine-worker/src/jobs.mjs','utf8');
 assert(jobsSource.includes('RENDER_MS_PER_FRAME = 240')&&clientSource.includes('RENDER_MS_PER_FRAME = 240'),'the render capture deadline must stay identical in the worker and the client');
@@ -47,6 +59,12 @@ const configSource=await readFile('host/config.js','utf8');
 assert(configSource.includes('192 * 1024 * 1024'),'a long 1080x1920 export must not hit the artifact ceiling');
 assert(bridgeSourceForProfile.includes('music-scoring-library/SKILL.md'),'audio.guide must bundle the companion genre library');
 assert(bridgeSourceForProfile.includes('drama-beat-shifts/SKILL.md'),'audio.guide must bundle the beat-shift designer');
+assert(bridgeSourceForProfile.includes('beat-alignment/SKILL.md'),'audio.guide must bundle the beat-alignment manual');
+const beatAlignmentSkill=await readFile('skills/beat-alignment/SKILL.md','utf8');
+assert(beatAlignmentSkill.includes('卡点必须来自测量'),'hit points must be measured, never imagined');
+assert(beatAlignmentSkill.includes('timeline.beatmap')&&beatAlignmentSkill.includes('asset.align'),'the manual must use both measured methods');
+assert(beatAlignmentSkill.includes('不计费'),'the fallback beat layer must be honest about being free local synthesis');
+assert(beatAlignmentSkill.includes('诚实边界'),'a weak pulse must be reported, not claimed as a locked beat');
 const beatShiftSkill=await readFile('skills/drama-beat-shifts/SKILL.md','utf8');
 assert(beatShiftSkill.includes('快节奏AI短剧情绪突变设计器')&&beatShiftSkill.includes('每个稳态/爆发段 = 一条独立 cue'),'the designer must map hard cuts onto real plugin edits');
 const librarySkill=await readFile('skills/music-scoring-library/SKILL.md','utf8');
@@ -54,13 +72,25 @@ assert(librarySkill.includes('配乐库')&&librarySkill.includes('复仇、霸�
 assert(librarySkill.includes('absolute clock seconds are forbidden'),'hit points use cue-relative positions, never fake second precision');
 const creationSkill=await readFile('skills/audio-creation/SKILL.md','utf8');
 assert(creationSkill.includes('END THE TURN'),'the bundled skill keeps the confirmation gate');
-assert(librarySkill.includes('卡点结构线')&&creationSkill.includes('卡点结构线')&&beatShiftSkill.includes('卡点结构线'),'all three skills must enforce the video-anchored beat-point line');
+assert(librarySkill.includes('卡点结构线')&&creationSkill.includes('卡点结构线')&&beatShiftSkill.includes('卡点结构线')&&beatAlignmentSkill.includes('卡点结构线'),'every bundled skill must enforce the video-anchored beat-point line');
+assert(creationSkill.includes('timeline.beatmap')&&creationSkill.includes('asset.align'),'the audio-creation loop must route through the measured methods');
+assert(!creationSkill.includes('grade the chosen window against the 卡点·转场 column row by row'),'the skill must no longer grade alignment by eye');
 const profileConfig={projectIds:new Set(['demo'])};
 assert.deepEqual(validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120}),{projectId:'demo',fromFrame:0,toFrame:120});
 assert.deepEqual(validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',assetId:'as_500f1291'}),{projectId:'demo',assetId:'as_500f1291'});
 assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:5,toFrame:5}),(e)=>e.code==='E_PARAMS');
 assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120,assetId:'as_500f1291'}),(e)=>e.code==='E_PARAMS','assetId and a range are mutually exclusive');
 assert.throws(()=>validateParams(profileConfig,'timeline.audioProfile',{projectId:'demo',fromFrame:0,toFrame:120,clipId:'cl_x'}),(e)=>e.code==='E_PARAMS');
+// Beat analysis parameter contract.
+assert.deepEqual(validateParams(profileConfig,'timeline.beatmap',{projectId:'demo',fromFrame:0,toFrame:120}),{projectId:'demo',fromFrame:0,toFrame:120});
+assert.throws(()=>validateParams(profileConfig,'timeline.beatmap',{projectId:'demo',fromFrame:0,toFrame:12000}),(e)=>e.code==='E_PARAMS','a six minute window is the maximum');
+assert.throws(()=>validateParams(profileConfig,'timeline.beatmap',{projectId:'demo',fromFrame:0,toFrame:0}),(e)=>e.code==='E_PARAMS');
+assert.deepEqual(validateParams(profileConfig,'asset.align',{projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120,hitFrames:[30,60,90],tempoLock:false}),{projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120,hitFrames:[30,60,90],tempoLock:false});
+assert.throws(()=>validateParams(profileConfig,'asset.align',{projectId:'demo',fromFrame:0,toFrame:120}),(e)=>e.code==='E_PARAMS','asset.align needs the generated music asset');
+assert.throws(()=>validateParams(profileConfig,'asset.align',{projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120,hitFrames:[90,60]}),(e)=>e.code==='E_PARAMS','hit frames must be ascending');
+assert.throws(()=>validateParams(profileConfig,'asset.align',{projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120,hitFrames:[60,300]}),(e)=>e.code==='E_PARAMS','hit frames must stay inside the range');
+assert.throws(()=>validateParams(profileConfig,'asset.align',{projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120,tempoLock:'yes'}),(e)=>e.code==='E_PARAMS');
+assert.throws(()=>validateParams(profileConfig,'asset.align',{projectId:'demo',assetId:'as_500f1291',revision:'b'.repeat(64),fromFrame:0,toFrame:120}),(e)=>e.code==='E_PARAMS','the model cannot pin a revision here; the Host re-inspects');
 const profileBridge=Object.create(VideoBridge.prototype);
 profileBridge.rememberFacts=()=>{};profileBridge.closing=false;profileBridge.disposed=false;
 const visualWindows=[];
@@ -96,6 +126,27 @@ assert.equal(assetCurve.curve[0],0.05);
 assert.equal(assetCurve.curve[30],0.8);
 assert(assetCurve.durationSeconds>210&&assetCurve.durationSeconds<220);
 assert.equal(assetCurve.materialPeak,1);
+// ── Beat facades: the Host resolves the authoritative revision itself and turns
+//    the measurement into steps the model can apply verbatim ──
+const beatBridge=Object.create(VideoBridge.prototype);
+const beatCalls=[];
+beatBridge.rememberFacts=()=>{};
+beatBridge.callClient=async(method,params)=>{
+  beatCalls.push([method,Object.keys(params).join(',')]);
+  if(method==='timeline.inspect')return {revision:'c'.repeat(64),durationFrames:600,tracks:[],assets:[]};
+  if(method==='timeline.beatmap')return {revision:params.revision,fps:30,fromFrame:params.fromFrame,toFrame:params.toFrame,rangeFrames:params.toFrame-params.fromFrame,hits:[{frame:150,seconds:5,pct:50,source:'cut',strength:1,aligned:true}],grid:{bpm:120,intervalSeconds:0.5,phaseSeconds:0,confidence:0.9},cutCount:1,onsetCount:0,sampledClips:1,unsampledClips:0,truncated:false};
+  if(method==='asset.align')return {revision:params.revision,assetId:params.assetId,assetFps:30,assetDurationSeconds:210,fromFrame:params.fromFrame,toFrame:params.toFrame,rangeFrames:params.toFrame-params.fromFrame,hitCount:1,song:{bpm:112,intervalSeconds:0.536,confidence:0.7,onsetCount:80},grid:{bpm:120,intervalSeconds:0.5,confidence:0.9},tempoLock:params.tempoLock,candidates:[],best:{sourceInFrame:1500,seconds:50,speed:1.07,hitRate:0.5,meanErrorFrames:9,maxErrorFrames:20,toleranceFrames:5,onsetCount:60,drift:[]},beatLayer:{score:{duration:4,seed:7,masterDb:-6,events:[{sound:'kick',at:1,duration:0.16,note:36,gainDb:-6}]}},beatLayerReason:'drift',warnings:[]};
+  throw new Error('unexpected engine method '+method);
+};
+const beatmap=await beatBridge.beatmap({projectId:'demo',fromFrame:0,toFrame:120});
+assert.equal(beatmap.grid.bpm,120);
+assert.deepEqual(beatCalls[0],['timeline.inspect','projectId'],'the beatmap facade inspects before it measures');
+assert.deepEqual(beatCalls[1],['timeline.beatmap','projectId,revision,fromFrame,toFrame'],'the facade pins the authoritative revision it just read');
+const alignment=await beatBridge.alignMusic({projectId:'demo',assetId:'as_500f1291',fromFrame:0,toFrame:120});
+assert.deepEqual(beatCalls[3],['asset.align','projectId,revision,assetId,fromFrame,toFrame,tempoLock'],'tempoLock is passed explicitly, defaulting to true');
+assert(alignment.note.includes('sourceInFrame:1500')&&alignment.note.includes('clip.speed')&&alignment.note.includes('procedural'),'the answer must be directly applicable');
+assert(alignment.note.includes('hitRate 0.5'),'the facade keeps the measured hit rate in the report');
+assert.equal(alignment.beatLayer.score.events[0].sound,'kick','the free beat layer survives the facade untouched');
 assert(!text.includes('User additional instructions'),'no custom block without page settings');
 // A bound session with a custom prompt gets the block verbatim (max 2000).
 const longCustom='配乐保持器乐。'.repeat(300)+'OVERFLOW-SENTINEL'; // 1951 + sentinel > 2000
@@ -157,6 +208,8 @@ await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds
 await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},promptController),'demo','send-6','x'.repeat(4001)),e=>e.code==='E_PARAMS');
 // A transport failure is reported as unconfirmed, never as a silent success.
 await assert.rejects(()=>SessionService.prototype.send.call(sendHost({sessionIds:['s-active'],activeSessionId:'s-active'},{prompt:async()=>{throw new Error('socket closed');}}),'demo','send-7','x'),e=>e.code==='E_SESSION_SEND');
-console.log(JSON.stringify({ok:true,contextChars:text.length,customChars:withCustom.length,checks:27}));
+// Derived so the reported number cannot drift from the assertions actually here.
+const ownSource=await readFile(new URL(import.meta.url),'utf8');
+console.log(JSON.stringify({ok:true,contextChars:text.length,customChars:withCustom.length,checks:(ownSource.match(/^\s*assert[.(]/gm)||[]).length}));
 
 let plugin;vm.runInNewContext(await readFile('client.js','utf8'),{window:{__ModuleLoader__:{load(m){plugin=m.factory(()=>({createElement(){}}));}}},console,URL,TextEncoder,AbortController});assert(plugin.inject.includes('sessions'),'Client must await the Session service instead of caching an early null');

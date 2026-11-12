@@ -124,6 +124,14 @@
       "request": "#/$defs/request_asset_envelope",
       "result": "#/$defs/result_asset_envelope"
     },
+    "timeline.beatmap": {
+      "request": "#/$defs/request_timeline_beatmap",
+      "result": "#/$defs/result_timeline_beatmap"
+    },
+    "asset.align": {
+      "request": "#/$defs/request_asset_align",
+      "result": "#/$defs/result_asset_align"
+    },
     "timeline.inspect": {
       "request": "#/$defs/request_timeline_inspect",
       "result": "#/$defs/result_timeline_inspect"
@@ -4036,6 +4044,696 @@
         "peaks",
         "rms",
         "materialPeak"
+      ]
+    },
+    "params_timeline_beatmap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        }
+      },
+      "required": [
+        "projectId",
+        "revision",
+        "fromFrame",
+        "toFrame"
+      ]
+    },
+    "request_timeline_beatmap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "timeline.beatmap"
+        },
+        "params": {
+          "$ref": "#/$defs/params_timeline_beatmap"
+        }
+      },
+      "required": [
+        "v",
+        "id",
+        "method",
+        "params"
+      ]
+    },
+    "result_timeline_beatmap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fps": {
+          "const": 30
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "rangeFrames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10800
+        },
+        "hits": {
+          "type": "array",
+          "maxItems": 120,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "frame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 108000
+              },
+              "seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 360
+              },
+              "pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "source": {
+                "enum": [
+                  "cut",
+                  "onset"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "aligned": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "frame",
+              "seconds",
+              "pct",
+              "source",
+              "strength"
+            ]
+          }
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bpm": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 40,
+              "maximum": 200
+            },
+            "intervalSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0.3,
+              "maximum": 1.5
+            },
+            "phaseSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1.5
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "bpm",
+            "intervalSeconds",
+            "phaseSeconds",
+            "confidence"
+          ]
+        },
+        "cutCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "onsetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "sampledClips": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "unsampledClips": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "revision",
+        "fps",
+        "fromFrame",
+        "toFrame",
+        "rangeFrames",
+        "hits",
+        "grid",
+        "cutCount",
+        "onsetCount",
+        "sampledClips",
+        "unsampledClips",
+        "truncated"
+      ]
+    },
+    "params_asset_align": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "assetId": {
+          "type": "string",
+          "pattern": "^as_[a-f0-9]{8}$"
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "hitFrames": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 108000
+          }
+        },
+        "tempoLock": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "projectId",
+        "revision",
+        "assetId",
+        "fromFrame",
+        "toFrame"
+      ]
+    },
+    "request_asset_align": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "asset.align"
+        },
+        "params": {
+          "$ref": "#/$defs/params_asset_align"
+        }
+      },
+      "required": [
+        "v",
+        "id",
+        "method",
+        "params"
+      ]
+    },
+    "result_asset_align": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "assetId": {
+          "type": "string",
+          "pattern": "^as_[a-f0-9]{8}$"
+        },
+        "assetFps": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "assetDurationSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 7200
+        },
+        "fromFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "toFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 108000
+        },
+        "rangeFrames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10800
+        },
+        "hitCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "song": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bpm": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 40,
+              "maximum": 200
+            },
+            "intervalSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0.3,
+              "maximum": 1.5
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "onsetCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 400
+            }
+          },
+          "required": [
+            "bpm",
+            "intervalSeconds",
+            "confidence",
+            "onsetCount"
+          ]
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bpm": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 40,
+              "maximum": 200
+            },
+            "intervalSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0.3,
+              "maximum": 1.5
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "bpm",
+            "intervalSeconds",
+            "confidence"
+          ]
+        },
+        "tempoLock": {
+          "type": "boolean"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "sourceInFrame": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 216000
+              },
+              "seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 7200
+              },
+              "speed": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 4
+              },
+              "hitRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "meanErrorFrames": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10800
+              },
+              "maxErrorFrames": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10800
+              },
+              "toleranceFrames": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 10800
+              },
+              "onsetCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 400
+              }
+            },
+            "required": [
+              "sourceInFrame",
+              "seconds",
+              "speed",
+              "hitRate",
+              "meanErrorFrames",
+              "maxErrorFrames",
+              "toleranceFrames",
+              "onsetCount"
+            ]
+          }
+        },
+        "best": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sourceInFrame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 216000
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 7200
+            },
+            "speed": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 4
+            },
+            "hitRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "meanErrorFrames": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10800
+            },
+            "maxErrorFrames": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10800
+            },
+            "toleranceFrames": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 10800
+            },
+            "onsetCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 400
+            },
+            "drift": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hitFrame": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 108000
+                  },
+                  "nearestOnsetFrame": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 216000
+                  },
+                  "errorFrames": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 10800
+                  },
+                  "hitSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 360
+                  }
+                },
+                "required": [
+                  "hitFrame",
+                  "nearestOnsetFrame",
+                  "errorFrames",
+                  "hitSeconds"
+                ]
+              }
+            }
+          },
+          "required": [
+            "sourceInFrame",
+            "seconds",
+            "speed",
+            "hitRate",
+            "meanErrorFrames",
+            "maxErrorFrames",
+            "toleranceFrames",
+            "onsetCount",
+            "drift"
+          ]
+        },
+        "beatLayer": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "score": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 180
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "masterDb": {
+                  "type": "number",
+                  "minimum": -30,
+                  "maximum": 0
+                },
+                "events": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 512,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "sound": {
+                        "enum": [
+                          "sine",
+                          "pluck",
+                          "bell",
+                          "pad",
+                          "bass",
+                          "kick",
+                          "snare",
+                          "hat",
+                          "click",
+                          "whoosh",
+                          "riser",
+                          "rain"
+                        ]
+                      },
+                      "at": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 180
+                      },
+                      "duration": {
+                        "type": "number",
+                        "minimum": 0.005,
+                        "maximum": 30
+                      },
+                      "note": {
+                        "type": "number",
+                        "minimum": 24,
+                        "maximum": 108
+                      },
+                      "gainDb": {
+                        "type": "number",
+                        "minimum": -60,
+                        "maximum": 0
+                      },
+                      "pan": {
+                        "type": "number",
+                        "minimum": -1,
+                        "maximum": 1
+                      },
+                      "repeat": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 128
+                      },
+                      "every": {
+                        "type": "number",
+                        "minimum": 0.005,
+                        "maximum": 180
+                      }
+                    },
+                    "required": [
+                      "sound",
+                      "at",
+                      "duration"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "duration",
+                "seed",
+                "masterDb",
+                "events"
+              ]
+            }
+          },
+          "required": [
+            "score"
+          ]
+        },
+        "beatLayerReason": {
+          "enum": [
+            "aligned",
+            "drift",
+            "unavailable"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "required": [
+        "revision",
+        "assetId",
+        "assetFps",
+        "assetDurationSeconds",
+        "fromFrame",
+        "toFrame",
+        "rangeFrames",
+        "hitCount",
+        "song",
+        "grid",
+        "tempoLock",
+        "candidates",
+        "best",
+        "beatLayer",
+        "beatLayerReason",
+        "warnings"
       ]
     },
     "params_timeline_inspect": {

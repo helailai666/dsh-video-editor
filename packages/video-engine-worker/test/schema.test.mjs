@@ -531,6 +531,8 @@ function buildSample(method, state) {
     case "asset.list": return {projectId};
     case "asset.derive": return {projectId,assetId:"as_00000000",kind:"thumb"};
     case "asset.envelope": return {projectId,assetId:"as_00000000"};
+    case "timeline.beatmap": return {projectId,revision:state.revision,fromFrame:0,toFrame:300};
+    case "asset.align": return {projectId,revision:state.revision,assetId:"as_00000000",fromFrame:0,toFrame:300,hitFrames:[60,120,180],tempoLock:true};
     case "asset.remove": return {projectId,assetId:"as_00000000",operationId:"probe-remove"};
     case "asset.import":
       return {
