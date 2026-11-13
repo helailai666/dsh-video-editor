@@ -1,14 +1,27 @@
 import {dependencyManifest,dependencyFile} from './dependencies.mjs';
 import { mkdir, mkdtemp, rm, readFile, rename, stat } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
 import { audioMixPlan } from "./audio.mjs";
 import { runOwned } from "./process.mjs";
+import { defaultBrowserPath, windowsChromeVersion } from "./browser.mjs";
 import { fail, number } from "./errors.mjs";
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
+
+/**
+ * A stale registry browserPath (e.g. written by an old manual patch) must not
+ * break every capture job; fall back to the platform default when it points
+ * nowhere.
+ */
+function browserExecutable(config) {
+  const configured = config.browserPath;
+  if (typeof configured === "string" && configured && existsSync(configured))
+    return configured;
+  return defaultBrowserPath();
+}
 const cli = dependencyFile("hyperframes", "dist/cli.js");
 const terminal = new Set(["succeeded", "failed", "cancelled", "timed_out"]);
 export const MAX_FRAME_TIMES = 4;
@@ -232,9 +245,7 @@ export class Jobs {
     return {
       ...process.env,
       TMPDIR: resolve(temp, "tmp"),
-      HYPERFRAMES_BROWSER_PATH:
-        this.config.browserPath ||
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      HYPERFRAMES_BROWSER_PATH: browserExecutable(this.config),
       PRODUCER_BROWSER_GPU_MODE: "software",
       HYPERFRAMES_NO_TELEMETRY: "1",
       DO_NOT_TRACK: "1",
@@ -755,11 +766,14 @@ export function versions(config = {}) {
     sdk: pkg("@hyperframes/sdk"),
     gsap: pkg("gsap"),
     fps: 30,
-    browser: version(
-      config.browserPath ||
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      ["--version"],
-    ),
+    browser: (() => {
+      const exe = browserExecutable(config);
+      // chrome.exe --version can flash a window on Windows; read the version
+      // directory installed next to the executable instead.
+      return process.platform === "win32"
+        ? windowsChromeVersion(exe)
+        : version(exe, ["--version"]);
+    })(),
     ffmpeg: version("ffmpeg", ["-version"]),
     ffprobe: version("ffprobe", ["-version"]),
   };

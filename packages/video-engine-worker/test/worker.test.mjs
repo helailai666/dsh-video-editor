@@ -120,7 +120,10 @@ test("JSONL validation, real SDK, concurrent revision conflict and idempotency",
     await f.cleanup();
   }
 });
-test("realpath rejects escaped declared asset and entry without leaking disk paths", async () => {
+test(
+  "realpath rejects escaped declared asset and entry without leaking disk paths",
+  { skip: process.platform === "win32" && "symlink escape probe needs POSIX /etc/passwd" },
+  async () => {
   const f = await fixture(),
     c = client(f.registry);
   try {
@@ -138,7 +141,10 @@ test("realpath rejects escaped declared asset and entry without leaking disk pat
   }
 });
 
-test("parameter and output limits, entry escape and SDK filesystem persistence failure", async () => {
+test(
+  "parameter and output limits, entry escape and SDK filesystem persistence failure",
+  { skip: process.platform === "win32" && "persistence fault needs POSIX chmod bits" },
+  async () => {
   const { chmod, unlink } = await import("node:fs/promises");
   const f = await fixture(),
     c = client(f.registry);

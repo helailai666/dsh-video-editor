@@ -1,6 +1,17 @@
 # 当前状态
 
-更新：2026-11-11。
+更新：2026-11-13。
+
+## 本轮（`codex/win32-engine-support`，待 PR）：视频引擎正式支持 Windows
+
+用户实机：Windows 上干净 harness 安装后显示"视频引擎暂时不可用 / The video engine could not start"、新建工程不可用。根因是引擎按 macOS-only 验收（上游 issue #38 的四层阻断）；本轮把 2026-11-07 的一次性安装补丁正式化为源码改动，并顺带修掉一个被平台门禁掩盖的真实契约缺陷。
+
+- 引擎：`worker.mjs` 去掉启动 `POSIX only` 门禁；启动异常不再被吞（stderr 输出真实原因，Host 侧 stderr 环形缓冲可查）；`config.browserPath` 启动时导出为 `CHROME_PATH` 供进程内 puppeteer 使用。`process.mjs` `runOwned` 的 POSIX 逻辑原样保留，win32 走新分支：`taskkill /PID /T /F` 回收整棵进程树，返回形状一致。新模块 `browser.mjs`：按平台探测 Chrome（macOS 原路径不变；win32 扫描 ProgramFiles/ProgramFiles(x86)/LocalAppData 的标准安装位），doctor 在 win32 不 spawn `chrome.exe --version`（会弹窗），改读 chrome.exe 旁版本号目录。`jobs.mjs` 的 `browserExecutable` 在 registry browserPath 失效时回退平台默认（本机旧补丁曾写入过无效的 `Google Chrome\Application` 路径）。`timeline-visuals.mjs` 缩略图 puppeteer 兜底路径同步平台化。
+- Host：`bridge.js` prepareRuntime——当解析结果是 `.cmd/.bat`（DSH Desktop 的 `.desktop-bin\node.cmd` shim，Node 不允许 shell:false spawn）时，降级为 Host 自身 Electron 二进制 + 显式注入 `ELECTRON_RUN_AS_NODE=1` 跑 worker；`env.js` 白名单本身不变（继承的 ELECTRON_* 依旧剥除），该例外在注释中写明。
+- 真实缺陷（非平台边界）：`protocol.schema.json` 的 `$defs.request.oneOf` 缺 `timeline.beatmap`/`asset.align` 两个分支——PR #12 新方法在 win32 从未跑成集成门禁，解锁后被 schema.test 集成项暴露，已补。
+- 测试与门禁同步（均为平台语义，macOS 断言不变）：夹具改用 `dependencyFile` 解析 gsap + `VIDEO_FONT_PATH` 覆盖（与 prepare-fixture.mjs 同一环境变量）；symlink 逃逸、chmod 故障注入、0700 目录位、EPIPE 分离共 6 处加 win32 跳过或平台护栏；packaging.test 版本同步 0.9.0、src 清单补全（beat/browser/timeline-visuals/visuals/dependencies）、npm 调用 win32 shell、路径分隔比较平台中立；scene-template `request_*` 计数 41→44；check.mjs 运行时路径 guard 改为条件豁免（execPath 仅允许出现在 win32+shim 降级分支），并新增专门 check 钉住该门。
+- 本机（win32）实测证据：worker 套件 101 pass/0 fail/5 skipped（此前因引擎门禁整体 E_PROCESS_EXIT）；client real.test 全链路绿（doctor→open→inspect→**真实 1280×720 帧 PNG**→render cancel）；探针实测 `platform=win32`、Chrome 157.0.8103.78（版本号目录读取、无弹窗）、ffmpeg/ffprobe 9.0.2；check.mjs 59/0、smoke-client 86/0、model-contract 99 项（contextChars 6109/customChars 7974 不变）、packaging 绿。
+- 未验证/下一步：真实整片 mp4 导出需按提交号跑 stage-dev→test-host-engine，并由用户实机复验；真实 DSH Desktop 内 Electron-as-Node spawn 需实机重载插件确认一次；check-host 11 项 symlink EINVAL 为既有基线；audio-host/audio-creation 因引擎解锁推进到下一层平台边界（`E_AUDIO_UNSUPPORTED` 配乐 provider 能力与音轨上限分支），属配乐能力而非视频引擎，列为后续项。
 
 下面两节已合入 main（PR #11、#12）。本轮**未做版本 bump**（main 上 `package.json` 仍为 1.0.3）、**未创建 tag**、npm/GitHub Release 状态不变；两项都只有本机（Windows）语法/契约/纯单测证据，真实长片导出与真实云端配乐闭环尚未在 macOS 复跑。实机通过后，1.0.4 的 bump 与 tag 按当次授权再做。
 

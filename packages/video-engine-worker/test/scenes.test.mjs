@@ -21,6 +21,7 @@ import {
   validateDocumentHtml,
 } from "../src/scenes.mjs";
 import { base } from "./helpers.mjs";
+import { dependencyFile } from "../src/dependencies.mjs";
 
 const fixtureScenes = (overrides = {}) =>
   [0, 1, 2, 3].map((index) => ({
@@ -128,7 +129,7 @@ test("generated document passes CLI lint without errors or StaticGuard warning",
       JSON.stringify({ entry: "index.html", assets: ["assets/gsap.min.js"] }),
     );
     copyFileSync(
-      resolve(base, "node_modules/gsap/dist/gsap.min.js"),
+      dependencyFile("gsap", "dist/gsap.min.js"),
       resolve(dir, "assets/gsap.min.js"),
     );
     let parsed;
@@ -136,7 +137,7 @@ test("generated document passes CLI lint without errors or StaticGuard warning",
       parsed = JSON.parse(
         execFileSync(
           process.execPath,
-          [resolve(base, "node_modules/hyperframes/dist/cli.js"), "lint", dir, "--json"],
+          [dependencyFile("hyperframes", "dist/cli.js"), "lint", dir, "--json"],
           { encoding: "utf8" },
         ),
       );

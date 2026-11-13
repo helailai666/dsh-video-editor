@@ -7,7 +7,11 @@
  * start as a plain Node worker. Instead only an allowlist of operating-system
  * and rendering facts is copied; the source environment is never modified.
  *
- * This is hygiene, not a security sandbox.
+ * This is hygiene, not a security sandbox. The one deliberate exception is
+ * Windows, where the DSH shim resolves "node" to a non-spawnable .cmd file:
+ * the bridge then spawns the Host's own Electron binary as Node and re-adds
+ * ELECTRON_RUN_AS_NODE explicitly (see `workerNodeEnv` in host/bridge.js).
+ * Inherited values are still never passed through here.
  */
 
 const ALLOWED_EXACT = new Set([

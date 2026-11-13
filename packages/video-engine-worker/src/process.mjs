@@ -1,6 +1,80 @@
 import { spawn, execFileSync } from "node:child_process";
+import { join } from "node:path";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function taskkillPath() {
+  return join(process.env.SystemRoot || "C:\\Windows", "System32", "taskkill.exe");
+}
+
+/**
+ * Kill the whole process tree below `pid` (console + detached-looking Chrome
+ * helpers included). Windows has no `ps`, so taskkill /T replaces the POSIX
+ * ancestry scan; failures are swallowed because the tree may already be gone
+ * and the close-driven flow re-checks completion independently.
+ */
+function killTreeWin32(pid) {
+  try {
+    execFileSync(taskkillPath(), ["/PID", String(pid), "/T", "/F"], {
+      timeout: 15000,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch {}
+}
+
+async function runOwnedWin32(
+  argv,
+  { cwd, env, signal, timeoutMs = 120000, onOutput = () => {} },
+) {
+  if (signal?.aborted) return { status: "cancelled", pid: null };
+  const child = spawn(argv[0], argv.slice(1), {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  const pid = child.pid ?? null;
+  let reason,
+    stopping,
+    output = "";
+  const stop = (why) => {
+    if (stopping) return;
+    reason = why;
+    stopping = (async () => {
+      if (pid !== null) killTreeWin32(pid);
+    })();
+  };
+  const abort = () => stop("cancelled");
+  signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => stop("timed_out"), timeoutMs);
+  for (const stream of [child.stdout, child.stderr])
+    stream.on("data", (b) => {
+      const s = b.toString();
+      output = (output + s).slice(-65536);
+      onOutput(s);
+    });
+  try {
+    const exit = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    });
+    await stopping;
+    if (pid !== null) killTreeWin32(pid);
+    return {
+      status: reason || (exit.code === 0 ? "complete" : "failed"),
+      pid,
+      ...exit,
+      ownedPids: pid === null ? [] : [pid],
+      survivors: [],
+      output,
+    };
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+    if (pid !== null) killTreeWin32(pid);
+  }
+}
 function processes() {
   return execFileSync("ps", ["-axo", "pid=,ppid=,lstart=,command="], {
     encoding: "utf8",
@@ -25,7 +99,7 @@ export async function runOwned(
   { temp, cwd, env, signal, timeoutMs = 120000, onOutput = () => {} } = {},
 ) {
   if (process.platform === "win32")
-    throw new Error("Process ownership spike supports POSIX only");
+    return runOwnedWin32(argv, { cwd, env, signal, timeoutMs, onOutput });
 
   if (signal?.aborted) {
     return { status: "cancelled", pid: null };

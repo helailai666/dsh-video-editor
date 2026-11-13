@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, cp, copyFile, writeFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { dependencyFile } from "../src/dependencies.mjs";
 export const base = fileURLToPath(new URL("../", import.meta.url));
 export async function fixture() {
   await mkdir(resolve(base, "artifacts"), { recursive: true });
@@ -14,11 +15,13 @@ export async function fixture() {
   );
   for (const name of ["gsap.min.js", "MotionPathPlugin.min.js"])
     await copyFile(
-      resolve(base, "node_modules/gsap/dist", name),
+      dependencyFile("gsap", `dist/${name}`),
       resolve(project, "assets", name),
     );
+  // Same override as scripts/prepare-fixture.mjs: Windows/CI hosts provide no
+  // macOS system font and no nested node_modules under the package.
   await copyFile(
-    "/System/Library/Fonts/STHeiti Medium.ttc",
+    process.env.VIDEO_FONT_PATH || "/System/Library/Fonts/STHeiti Medium.ttc",
     resolve(project, "assets/Heiti.ttc"),
   );
   await writeFile(

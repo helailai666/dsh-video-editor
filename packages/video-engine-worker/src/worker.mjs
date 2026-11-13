@@ -452,7 +452,6 @@ try {
   const index = process.argv.indexOf("--registry");
   if (index < 0) throw Error("registry");
   const config = JSON.parse(await readFile(process.argv[index + 1], "utf8"));
-  if (process.platform === "win32") throw Error("POSIX only");
   if (Object.hasOwn(config, "projectsRoot")) {
     keys(
       config,
@@ -496,6 +495,10 @@ try {
     config.managed = false;
     await mkdir(config.outputRoot, { recursive: true });
   }
+  // Export the configured browser so in-process puppeteer fallbacks resolve
+  // the same Chrome as the HyperFrames child environment (Windows especially).
+  if (typeof config.browserPath === "string" && config.browserPath)
+    process.env.CHROME_PATH = config.browserPath;
   store = new Projects(config, { diagnostic });
   jobs = new Jobs(store, config);
   media = new MediaLibrary({ config: store.config, diagnostic });
@@ -557,7 +560,9 @@ try {
     diagnostic("unhandled rejection");
     void shutdown().finally(() => process.exit(1));
   });
-} catch {
-  diagnostic("startup failed");
+} catch (error) {
+  // Surface the real cause on stderr; the Host keeps a stderr ring buffer, so
+  // a swallowed exception must never be the only trace of a failed startup.
+  diagnostic(`startup failed: ${error?.message ?? String(error)}`);
   process.exitCode = 1;
 }
