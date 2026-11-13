@@ -445,7 +445,10 @@ check('P2-002-B: committed runtime carries no development/deployment absolute pa
   for (const name of runtime) {
     const source = read(name);
     for (const forbidden of ['/Users/', '/Applications/', 'process.execPath']) {
-      assert(source.includes(forbidden) === false, `${name} hard-codes or adopts unsupported runtime detail "${forbidden}"`);
+      // The single allowed adoption of the Host's own runtime is the Windows
+      // node.cmd shim fallback; the dedicated check below pins that gate.
+      const shimFallback = name === 'host/bridge.js' && forbidden === 'process.execPath';
+      assert(source.includes(forbidden) === false || (shimFallback && source.includes('\\.(cmd|bat)$')), `${name} hard-codes or adopts unsupported runtime detail "${forbidden}"`);
     }
   }
   assert(!Object.values(pkg.dependencies||{}).some(value=>/^(file:|link:|\/)/.test(value)), 'published dependencies must not use local filesystem paths');
@@ -600,6 +603,15 @@ check('P2-004 R4: client version gate is a strict complete semver comparison', (
   assert(bridge.includes('compareVersion(parsed, MIN_EXPLICIT_SPAWN_CLIENT)'), 'semantic version comparison missing');
   assert(bridge.includes('Number(part) || 0') === false, 'version parsing still coerces invalid parts to 0');
   return '>=0.1.1 complete semver; no coercion';
+});
+
+check('P2-002-B: the Host adopts its own runtime only in the win32 node.cmd shim fallback', () => {
+  const source = read('host/bridge.js');
+  if (source.includes('process.execPath')) {
+    assert(source.includes("process.platform === 'win32'"), 'execPath adoption must stay win32-gated');
+    assert(source.includes('\\.(cmd|bat)$'), 'execPath adoption must require a resolved .cmd/.bat shim');
+  }
+  return source.includes('process.execPath') ? 'win32 shim fallback only, gated on platform + extension' : 'no self-adoption';
 });
 
 check('P2-002-B: Host modules do not import DSH-internal packages', () => {

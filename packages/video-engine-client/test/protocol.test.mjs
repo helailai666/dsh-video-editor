@@ -280,7 +280,17 @@ test("normal dispose lets an isolated parent exit before its shutdown deadline",
   }
 });
 
-test("isolated parent separates sent requests from refusals after a stdin failure", async () => {
+test(
+  "isolated parent separates sent requests from refusals after a stdin failure",
+  {
+    // Windows anonymous pipes swallow writes to a closed stdin instead of
+    // raising EPIPE, so the parent observes request timeouts rather than the
+    // POSIX transport failure this contract pins down.
+    skip:
+      process.platform === "win32" &&
+      "EPIPE-based transport separation is POSIX pipe behavior",
+  },
+  async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "dsh-engine-client-epipe-"));
   const registry = resolve(dir, "registry.json");
   const parent = resolve(import.meta.dirname, "fixtures/epipe-parent.mjs");

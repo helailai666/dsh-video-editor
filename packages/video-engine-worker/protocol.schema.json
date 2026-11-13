@@ -3386,6 +3386,12 @@
         },
         {
           "$ref": "#/$defs/request_asset_envelope"
+        },
+        {
+          "$ref": "#/$defs/request_timeline_beatmap"
+        },
+        {
+          "$ref": "#/$defs/request_asset_align"
         }
       ]
     },

@@ -120,8 +120,12 @@ test("preview.snapshot publishes a faithful private copy with relative paths onl
     // tree restricted to the worker user.
     const previewsRoot = resolve(f.outputRoot, "previews");
     const snapshotDir = resolve(previewsRoot, snapshot.snapshotId);
-    assert.equal((await stat(previewsRoot)).mode & 0o777, 0o700);
-    assert.equal((await stat(snapshotDir)).mode & 0o777, 0o700);
+    // NTFS has no POSIX permission bits; the 0700 restriction is enforced and
+    // proven on macOS/Linux only.
+    if (process.platform !== "win32") {
+      assert.equal((await stat(previewsRoot)).mode & 0o777, 0o700);
+      assert.equal((await stat(snapshotDir)).mode & 0o777, 0o700);
+    }
     assert.deepEqual(await filesUnder(snapshotDir), before.files.map((file) => file.path).sort());
     for (const file of before.files) {
       const copied = await readFile(resolve(snapshotDir, file.path));
@@ -371,7 +375,10 @@ test("preview snapshots are cleaned by shutdown and a fresh worker discards left
   }
 });
 
-test("preview copies re-check declared paths, sizes and cleanup failures", async () => {
+test(
+  "preview copies re-check declared paths, sizes and cleanup failures",
+  { skip: process.platform === "win32" && "escape probe needs POSIX symlinks" },
+  async () => {
   const f = await managed("previews-safety");
   try {
     const project = await created(f.c);

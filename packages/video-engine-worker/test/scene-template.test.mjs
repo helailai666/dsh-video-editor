@@ -420,8 +420,9 @@ test("scene.template schema is required, closed and rejects malformed templates"
       validate({ ...inspected.scenes[0], template: undefined }, schema.$defs.inspectScene, schema).length > 0,
     );
     // P3-012 adds project.compose/project.source; P3-016 adds project.rename;
-    // all other methods stay.
-    assert.equal(Object.keys(schema.$defs).filter((name) => name.startsWith("request_")).length, 41);
+    // the beat-alignment round adds timeline.beatmap/asset.align; all other
+    // methods stay.
+    assert.equal(Object.keys(schema.$defs).filter((name) => name.startsWith("request_")).length, 44);
   } finally {
     await f.cleanup();
   }

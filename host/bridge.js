@@ -1647,6 +1647,18 @@ export class VideoBridge {
       throw configurationError('"workerNode" did not resolve to an absolute executable');
     }
     const nodeReal = await canonicalFile(nodeExecutable, 'workerNode');
+    // DSH Desktop on Windows resolves "node" to a .desktop-bin\node.cmd shim.
+    // A .cmd cannot be spawned without a shell (EINVAL with shell:false), and
+    // buildWorkerEnv strips ELECTRON_* by design. When that shim is what we
+    // resolved, run the worker on the Host's own Electron binary as Node
+    // (Electron-as-Node) — the exact runtime executing this code right now —
+    // by re-adding ELECTRON_RUN_AS_NODE explicitly at spawn time.
+    let workerNode = nodeReal;
+    let workerNodeEnv = null;
+    if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(nodeReal)) {
+      workerNode = await canonicalFile(process.execPath, 'workerNode');
+      workerNodeEnv = { ELECTRON_RUN_AS_NODE: '1' };
+    }
 
     const registryPath = await canonicalFile(paths.registryPath, 'dataRoot/registry.json');
     const registryStat = await stat(registryPath);
@@ -1699,7 +1711,8 @@ export class VideoBridge {
 
     return {
       config,
-      nodeExecutable: nodeReal,
+      nodeExecutable: workerNode,
+      workerNodeEnv,
       workerEntry: workerEntryReal,
       workerCwd,
       registryPath,
@@ -1723,7 +1736,7 @@ export class VideoBridge {
         workerEntry: runtime.workerEntry,
         registryPath: runtime.registryPath,
         cwd: runtime.workerCwd,
-        env: Object.assign({}, this.environment),
+        env: Object.assign({}, this.environment, runtime.workerNodeEnv),
         startupTimeoutMs: runtime.config.startupTimeoutMs,
         requestTimeoutMs: runtime.config.requestTimeoutMs,
         shutdownTimeoutMs: runtime.config.shutdownTimeoutMs,

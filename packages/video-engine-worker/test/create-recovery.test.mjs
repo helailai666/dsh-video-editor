@@ -71,7 +71,10 @@ test("project.create cleans its directory and registry state when a post-copy st
   }
 });
 
-test("project.create rolls back when the registry write fails; next start stays healthy", async () => {
+test(
+  "project.create rolls back when the registry write fails; next start stays healthy",
+  { skip: process.platform === "win32" && "write fault injection needs POSIX chmod bits" },
+  async () => {
   const f = await managedConfig("create-registry-failure");
   const store = new Projects(f.config);
   const registryDir = resolve(f.dataPath, "..");
@@ -100,7 +103,10 @@ test("project.create rolls back when the registry write fails; next start stays 
   }
 });
 
-test("worker create keeps working and restart succeeds after a registry write fault", async () => {
+test(
+  "worker create keeps working and restart succeeds after a registry write fault",
+  { skip: process.platform === "win32" && "write fault injection needs POSIX chmod bits" },
+  async () => {
   const f = await managed("create-protocol-failure");
   const registryDir = resolve(f.dataPath, "..");
   try {

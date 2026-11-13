@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 
 const clientRoot = resolve(import.meta.dirname, "..");
 const workerRoot = resolve(import.meta.dirname, "../../video-engine-worker");
-const version = "0.8.3";
+const version = "0.9.0";
 const clientFiles = ["README.md", "package.json", "src/index.mjs"];
 const workerFiles = [
   "README.md",
@@ -24,7 +24,10 @@ const workerFiles = [
   "protocol.schema.json",
   "src/assets.mjs",
   "src/audio.mjs",
+  "src/beat.mjs",
+  "src/browser.mjs",
   "src/composition.mjs",
+  "src/dependencies.mjs",
   "src/errors.mjs",
   "src/history.mjs",
   "src/jobs.mjs",
@@ -35,7 +38,9 @@ const workerFiles = [
   "src/projects.mjs",
   "src/registry.mjs",
   "src/scenes.mjs",
+  "src/timeline-visuals.mjs",
   "src/timeline.mjs",
+  "src/visuals.mjs",
   "src/worker.mjs",
 ];
 
@@ -65,7 +70,14 @@ function pack(root, expectedFilename) {
           [npmCli, ...args],
           { cwd: root, encoding: "utf8", env },
         )
-      : execFileSync("npm", args, { cwd: root, encoding: "utf8", env });
+      // On Windows, "npm" is an npm.cmd shim, which Node refuses to spawn
+      // without a shell; shell:true keeps this test-only invocation working.
+      : execFileSync("npm", args, {
+          cwd: root,
+          encoding: "utf8",
+          env,
+          shell: process.platform === "win32",
+        });
   const [info] = JSON.parse(output);
   assert.equal(info.filename, expectedFilename);
   return resolve(artifacts, info.filename);
@@ -164,12 +176,15 @@ test("fixed tarballs expose runtime entries and resolve from staging", async (t)
     for (const file of [
       "src/index.mjs",
       "src/assets.mjs",
-  "src/audio.mjs",
+      "src/audio.mjs",
+      "src/beat.mjs",
+      "src/browser.mjs",
       "src/composition.mjs",
+      "src/dependencies.mjs",
       "src/errors.mjs",
       "src/history.mjs",
-      "src/layout.mjs",
       "src/jobs.mjs",
+      "src/layout.mjs",
       "src/merge.mjs",
       "src/previews.mjs",
       "src/process.mjs",
@@ -177,7 +192,9 @@ test("fixed tarballs expose runtime entries and resolve from staging", async (t)
       "src/registry.mjs",
       "src/scenes.mjs",
       "src/timeline.mjs",
-  "src/worker.mjs",
+      "src/timeline-visuals.mjs",
+      "src/visuals.mjs",
+      "src/worker.mjs",
       "protocol.schema.json",
     ]) {
       const root =
@@ -224,9 +241,11 @@ process.stdout.write(JSON.stringify({
     );
     assert.equal(resolved.clientVersion, version);
     assert.equal(resolved.workerVersion, version);
-    assert.ok(resolved.clientEntry.endsWith("/src/index.mjs"));
-    assert.ok(resolved.workerEntry.endsWith("/src/worker.mjs"));
-    assert.ok(resolved.workerManifestPath.endsWith("/package.json"));
+    // require.resolve reports native separators; compare platform-neutrally.
+    const posix = (path) => path.split(/[\\/]/).join("/");
+    assert.ok(posix(resolved.clientEntry).endsWith("/src/index.mjs"));
+    assert.ok(posix(resolved.workerEntry).endsWith("/src/worker.mjs"));
+    assert.ok(posix(resolved.workerManifestPath).endsWith("/package.json"));
   } finally {
     await rm(extracted, { recursive: true, force: true });
     await rm(staging, { recursive: true, force: true });

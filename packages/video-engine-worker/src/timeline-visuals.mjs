@@ -8,6 +8,7 @@ import {timelineRevision} from './timeline.mjs';
 import {sourceSeconds} from './visuals.mjs';
 import {inside} from './registry.mjs';
 import {chooseWindow, compileBeatLayer, estimateGrid, mergeOnsetHits, onsetsFromEnvelope, pictureHits} from './beat.mjs';
+import {defaultBrowserPath} from './browser.mjs';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 export function validateVisualRequest(p){
  if(!/^cl_[a-z0-9]+$/.test(p.clipId)||!Number.isSafeInteger(p.startFrame)||!Number.isSafeInteger(p.endFrame)||p.startFrame<0||p.endFrame<=p.startFrame||!Number.isSafeInteger(p.count)||p.count<1||p.count>4)fail('E_PARAMS','Invalid visual sampling window');
@@ -250,7 +251,7 @@ export class TimelineVisuals {
     }catch{res.writeHead(404).end();}});
     await new Promise(yes=>context.server.listen(0,'127.0.0.1',yes));
     const {default:puppeteer}=await import('puppeteer-core');
-    context.browser=await puppeteer.launch({executablePath:process.env.CHROME_PATH??process.env.PUPPETEER_EXECUTABLE_PATH??'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--disable-gpu','--no-sandbox']});
+    context.browser=await puppeteer.launch({executablePath:process.env.CHROME_PATH??process.env.PUPPETEER_EXECUTABLE_PATH??defaultBrowserPath(),headless:true,args:['--disable-gpu','--no-sandbox']});
     context.abort=()=>void context.browser.close();signal.addEventListener('abort',context.abort,{once:true});
     const page=context.page=await context.browser.newPage(),origin=`http://127.0.0.1:${context.server.address().port}`;
     await page.setRequestInterception(true);page.on('request',request=>{const url=request.url();if(url.startsWith(origin+'/')||url.startsWith('data:'))void request.continue();else void request.abort();});
